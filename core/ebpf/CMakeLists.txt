@@ -13,13 +13,9 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.22)
-project(pipeline)
+project(ebpf)
 
-file(GLOB LIB_SOURCE_FILES *.cpp *.h)
+file(GLOB_RECURSE LIB_SOURCE_FILES *.cpp *.h)
 append_source_files(LIB_SOURCE_FILES)
 add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} models)
-target_link_libraries(${PROJECT_NAME} plugin)
-target_link_libraries(${PROJECT_NAME} plugin_instance)
-target_link_libraries(${PROJECT_NAME} ebpf)
-
+target_link_libraries(${PROJECT_NAME} pipeline)

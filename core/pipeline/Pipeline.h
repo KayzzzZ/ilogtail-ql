@@ -59,8 +59,8 @@ public:
 private:
     bool handleInputFileProcessor(const InputFile* inputFile, int16_t& pluginIndex, const Config& config);
     bool handleInputContainerStdioProcessor(const InputContainerStdio* inputContainerStdio,
-                                          int16_t& pluginIndex,
-                                          const Config& config);
+                                            int16_t& pluginIndex,
+                                            const Config& config);
     void MergeGoPipeline(const Json::Value& src, Json::Value& dst);
     void AddPluginToGoPipeline(const Json::Value& plugin, const std::string& module, Json::Value& dst);
     void CopyNativeGlobalParamToGoPipeline(Json::Value& root);
@@ -81,6 +81,12 @@ private:
     friend class PipelineUnittest;
     friend class InputFileUnittest;
     friend class ProcessorTagNativeUnittest;
+    friend class InputEbpfFileSecurityUnittest;
+    friend class InputEbpfProcessSecurityUnittest;
+    friend class InputEbpfNetworkSecurityUnittest;
+    friend class InputEbpfProfileObserverUnittest;
+    friend class InputEbpfProcessObserverUnittest;
+    friend class InputEbpfNetworkObserverUnittest;
 #endif
 };
 

@@ -20,6 +20,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/ParamExtractor.h"
 #include "common/RuntimeUtil.h"
 #include "config_manager/ConfigManager.h"
 #include "logger/Logger.h"
@@ -299,6 +300,9 @@ void AppConfig::LoadAppConfig(const std::string& ilogtailConfigFile) {
 
     CheckAndResetProxyEnv();
     mConfJson = confJson;
+
+    // ebpf
+    LoadEbpfConfig(confJson);
 }
 
 void AppConfig::LoadEnvTags() {
@@ -1246,6 +1250,133 @@ void AppConfig::UpdateFileTags() {
         }
     }
     return;
+}
+
+void AppConfig::LoadEbpfConfig(const Json::Value& confJson) {
+    string errorMsg;
+    // ReceiveEventChanCap (Optional)
+    if (!GetOptionalIntParam(confJson, "ReceiveEventChanCap", mReceiveEventChanCap, errorMsg)) {
+        LOG_ERROR(sLogger, ("load ReceiveEventChanCap fail", errorMsg));
+        return;
+    }
+    // AdminConfig (Optional)
+    if (IsMapValid(confJson, "AdminConfig", errorMsg)) {
+        const Json::Value& thisAdminConfig = confJson["AdminConfig"];
+        // AdminConfig.DebugMode (Optional)
+        if (!GetOptionalBoolParam(thisAdminConfig, "DebugMode", mAdminConfig.mDebugMode, errorMsg)) {
+            LOG_ERROR(sLogger, ("load AdminConfig.DebugMode fail", errorMsg));
+            return;
+        }
+        // AdminConfig.LogLevel (Optional)
+        if (!GetOptionalStringParam(thisAdminConfig, "LogLevel", mAdminConfig.mLogLevel, errorMsg)) {
+            LOG_ERROR(sLogger, ("load AdminConfig.LogLevel fail", errorMsg));
+            return;
+        }
+        // AdminConfig.PushAllSpan (Optional)
+        if (!GetOptionalBoolParam(thisAdminConfig, "PushAllSpan", mAdminConfig.mPushAllSpan, errorMsg)) {
+            LOG_ERROR(sLogger, ("load AdminConfig.PushAllSpan fail", errorMsg));
+            return;
+        }
+    }
+    // AggregatorConfig (Optional)
+    if (IsMapValid(confJson, "AggregationConfig", errorMsg)) {
+        const Json::Value& thisAggregationConfig = confJson["AggregationConfig"];
+        // AggregationConfig.AggWindowSecond (Optional)
+        if (!GetOptionalIntParam(
+                thisAggregationConfig, "AggWindowSecond", mAggregationConfig.mAggWindowSecond, errorMsg)) {
+            LOG_ERROR(sLogger, ("load AggregationConfig.AggWindowSecond fail", errorMsg));
+            return;
+        }
+    }
+    // ConverageConfig (Optional)
+    if (IsMapValid(confJson, "ConverageConfig", errorMsg)) {
+        const Json::Value& thisConverageConfig = confJson["ConverageConfig"];
+        // ConverageConfig.Strategy (Optional)
+        if (!GetOptionalStringParam(thisConverageConfig, "Strategy", mConverageConfig.mStrategy, errorMsg)) {
+            LOG_ERROR(sLogger, ("load ConverageConfig.Strategy fail", errorMsg));
+            return;
+        }
+    }
+    // SamplingConfig (Optional)
+    if (IsMapValid(confJson, "SampleConfig", errorMsg)) {
+        const Json::Value& thisSampleConfig = confJson["SampleConfig"];
+        // SampleConfig.Strategy (Optional)
+        if (!GetOptionalStringParam(thisSampleConfig, "Strategy", mSampleConfig.mStrategy, errorMsg)) {
+            LOG_ERROR(sLogger, ("load SampleConfig.Strategy fail", errorMsg));
+            return;
+        }
+        // SampleConfig.Config (Optional)
+        if (!IsMapValid(thisSampleConfig, "Config", errorMsg)) {
+            LOG_ERROR(sLogger, ("load SampleConfig.Config fail", errorMsg));
+            return;
+        } else {
+            const Json::Value& thisSampleConfigConfig = thisSampleConfig["Config"];
+            // SampleConfig.Config.Rate (Optional)
+            if (!GetOptionalDoubleParam(thisSampleConfigConfig, "Rate", mSampleConfig.mConfig.mRate, errorMsg)) {
+                LOG_ERROR(sLogger, ("load SampleConfig.Config.Rate fail", errorMsg));
+                return;
+            }
+        }
+    }
+    // for Observer
+    // SocketProbeConfig (Optional)
+    if (IsMapValid(confJson, "SocketProbeConfig", errorMsg)) {
+        const Json::Value& thisSocketProbeConfig = confJson["SocketProbeConfig"];
+        // SocketProbeConfig.SlowRequestThresholdMs (Optional)
+        if (!GetOptionalIntParam(thisSocketProbeConfig,
+                                 "SlowRequestThresholdMs",
+                                 mSocketProbeConfig.mSlowRequestThresholdMs,
+                                 errorMsg)) {
+            LOG_ERROR(sLogger, ("load SocketProbeConfig.SlowRequestThresholdMs fail", errorMsg));
+            return;
+        }
+        // SocketProbeConfig.MaxConnTrackers (Optional)
+        if (!GetOptionalIntParam(
+                thisSocketProbeConfig, "MaxConnTrackers", mSocketProbeConfig.mMaxConnTrackers, errorMsg)) {
+            LOG_ERROR(sLogger, ("load SocketProbeConfig.MaxConnTrackers fail", errorMsg));
+            return;
+        }
+        // SocketProbeConfig.MaxBandWidthMbPerSec (Optional)
+        if (!GetOptionalIntParam(
+                thisSocketProbeConfig, "MaxBandWidthMbPerSec", mSocketProbeConfig.mMaxBandWidthMbPerSec, errorMsg)) {
+            LOG_ERROR(sLogger, ("load SocketProbeConfig.MaxBandWidthMbPerSec fail", errorMsg));
+            return;
+        }
+        // SocketProbeConfig.MaxRawRecordPerSec (Optional)
+        if (!GetOptionalIntParam(
+                thisSocketProbeConfig, "MaxRawRecordPerSec", mSocketProbeConfig.mMaxRawRecordPerSec, errorMsg)) {
+            LOG_ERROR(sLogger, ("load SocketProbeConfig.MaxRawRecordPerSec fail", errorMsg));
+            return;
+        }
+    }
+    // ProfileProbeConfig (Optional)
+    if (IsMapValid(confJson, "ProfileProbeConfig", errorMsg)) {
+        const Json::Value& thisProfileProbeConfig = confJson["ProfileProbeConfig"];
+        // ProfileProbeConfig.ProfileSampleRate (Optional)
+        if (!GetOptionalIntParam(
+                thisProfileProbeConfig, "ProfileSampleRate", mProfileProbeConfig.mProfileSampleRate, errorMsg)) {
+            LOG_ERROR(sLogger, ("load ProfileProbeConfig.ProfileSampleRate fail", errorMsg));
+            return;
+        }
+        // ProfileProbeConfig.ProfileUploadDuration (Optional)
+        if (!GetOptionalIntParam(thisProfileProbeConfig,
+                                 "ProfileUploadDuration",
+                                 mProfileProbeConfig.mProfileUploadDuration,
+                                 errorMsg)) {
+            LOG_ERROR(sLogger, ("load ProfileProbeConfig.ProfileUploadDuration fail", errorMsg));
+            return;
+        }
+    }
+    // ProcessProbeConfig (Optional)
+    if (IsMapValid(confJson, "ProcessProbeConfig", errorMsg)) {
+        const Json::Value& thisProcessProbeConfig = confJson["ProcessProbeConfig"];
+        // ProcessProbeConfig.EnableOOMDetect (Optional)
+        if (!GetOptionalBoolParam(
+                thisProcessProbeConfig, "EnableOOMDetect", mProcessProbeConfig.mEnableOOMDetect, errorMsg)) {
+            LOG_ERROR(sLogger, ("load ProcessProbeConfig.EnableOOMDetect fail", errorMsg));
+            return;
+        }
+    }
 }
 
 } // namespace logtail
