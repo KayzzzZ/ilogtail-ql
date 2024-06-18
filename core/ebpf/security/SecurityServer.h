@@ -22,7 +22,7 @@
 #include <mutex>
 #include <thread>
 
-#include "ebpf/observer/ObserverOptions.h"
+#include "ebpf/security/SecurityOptions.h"
 #include "pipeline/PipelineContext.h"
 #include "ebpf/SourceManager.h"
 
@@ -48,6 +48,7 @@ public:
 
     void Start(BPFSecurityPipelineType);
     void Stop(BPFSecurityPipelineType);
+    void Stop();
 
     // 其他函数注册：配置注册、注销等
     void AddSecurityOptions(const std::string& name,

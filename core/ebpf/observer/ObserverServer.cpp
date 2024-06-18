@@ -39,6 +39,11 @@ void ObserverServer::Stop(BPFObserverPipelineType type) {
     mIsRunning = false;
 }
 
+void ObserverServer::Stop() {
+    // TODO: ebpf_stop(); 停止所有类型的ebpf探针
+    mIsRunning = false;
+}
+
 // 插件配置注册逻辑
 // 负责启动对应的ebpf程序
 void ObserverServer::AddObserverOptions(const std::string& name,
@@ -91,7 +96,7 @@ void ObserverServer::RemoveObserverOptions(const std::string& name, size_t index
 }
 
 void ObserverServer::Init() {
-    std::call_once(once_, &InitBPF);
+    std::call_once(once_, std::bind(&ObserverServer::InitBPF, this));
 }
 
 void ObserverServer::InitBPF() {

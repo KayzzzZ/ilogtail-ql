@@ -1,3 +1,5 @@
+#pragma once
+
 #include <dlfcn.h>
 #include <iostream>
 #include <string>

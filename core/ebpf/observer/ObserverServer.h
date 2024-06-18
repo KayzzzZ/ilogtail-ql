@@ -48,6 +48,7 @@ public:
 
     void Start(BPFObserverPipelineType);
     void Stop(BPFObserverPipelineType);
+    void Stop();
 
     // 其他函数注册：配置注册、注销等
     void AddObserverOptions(const std::string& name,
