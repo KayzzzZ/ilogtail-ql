@@ -19,11 +19,22 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <mutex>
+#include <thread>
 
-#include "ebpf/security/SecurityOptions.h"
+#include "ebpf/observer/ObserverOptions.h"
 #include "pipeline/PipelineContext.h"
+#include "ebpf/SourceManager.h"
 
 namespace logtail {
+
+enum class BPFSecurityPipelineType {
+    UNKNOWN,
+    PIPELINE_PROCESS,
+    PIPELINE_NETWORK,
+    PIPELINE_FILE,
+    MAX,
+};
 
 class SecurityServer {
 public:
@@ -35,8 +46,8 @@ public:
         return &instance;
     }
 
-    void Start();
-    void Stop();
+    void Start(BPFSecurityPipelineType);
+    void Stop(BPFSecurityPipelineType);
 
     // 其他函数注册：配置注册、注销等
     void AddSecurityOptions(const std::string& name,
@@ -49,10 +60,15 @@ private:
     SecurityServer() = default;
     ~SecurityServer() = default;
 
+    void Init();
+    void InitBPF();
+
     bool mIsRunning = false;
     // TODO: 目前配置更新时，会停止ebpf探针、重新加载配置、重新启动ebpf探针，后续优化时需要考虑这里的并发问题
     std::unordered_map<std::string, SecurityConfig> mInputConfigMap;
     // std::unordered_map<pair<std::string, size_t>, const pointer*> mEbpfPointerMap;
+    logtail::ebpf::source_manager sm_;
+    std::once_flag once_;
 };
 
 } // namespace logtail

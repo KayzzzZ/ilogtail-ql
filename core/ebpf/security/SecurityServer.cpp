@@ -14,22 +14,26 @@
 
 #include "ebpf/security/SecurityServer.h"
 
+#include <thread>
+#include <mutex>
+#include <iostream>
 
 namespace logtail {
 
 // 负责接收ebpf返回的数据，然后将数据推送到对应的队列中
 // TODO: 目前暂时没有考虑并发Start的问题
-void SecurityServer::Start() {
+void SecurityServer::Start(BPFSecurityPipelineType type) {
     if (mIsRunning) {
         return;
     } else {
         mIsRunning = true;
         // TODO: 创建一个线程，用于接收ebpf返回的数据，并将数据推送到对应的队列中
+        
         LOG_INFO(sLogger, ("security ebpf server", "started"));
     }
 }
 
-void SecurityServer::Stop() {
+void SecurityServer::Stop(BPFSecurityPipelineType type) {
     // TODO: ebpf_stop(); 停止所有类型的ebpf探针
     mIsRunning = false;
 }
@@ -82,6 +86,15 @@ void SecurityServer::RemoveSecurityOptions(const std::string& name, size_t index
             break;
     }
     mInputConfigMap.erase(key);
+}
+
+void SecurityServer::Init() {
+    std::call_once(once_, &InitBPF);
+}
+
+void SecurityServer::InitBPF() {
+    sm_ = logtail::ebpf::source_manager();
+    sm_.initPlugin("/usr/local/ilogtail/libsockettrace.so", "");
 }
 
 } // namespace logtail

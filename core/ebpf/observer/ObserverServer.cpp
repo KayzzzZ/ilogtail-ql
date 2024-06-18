@@ -13,23 +13,28 @@
 // limitations under the License.
 
 #include "ebpf/observer/ObserverServer.h"
+#include "ebpf/SourceManager.h"
 
+#include <thread>
+#include <mutex>
+#include <iostream>
 
 namespace logtail {
 
 // 负责接收ebpf返回的数据，然后将数据推送到对应的队列中
 // TODO: 目前暂时没有考虑并发Start的问题
-void ObserverServer::Start() {
+void ObserverServer::Start(BPFObserverPipelineType type) {
     if (mIsRunning) {
         return;
     } else {
-        mIsRunning = false;
+        ObserverServer::Init();
+        mIsRunning = true;
         // TODO: 创建一个线程，用于接收ebpf返回的数据，并将数据推送到对应的队列中
         LOG_INFO(sLogger, ("observer ebpf server", "started"));
     }
 }
 
-void ObserverServer::Stop() {
+void ObserverServer::Stop(BPFObserverPipelineType type) {
     // TODO: ebpf_stop(); 停止所有类型的ebpf探针
     mIsRunning = false;
 }
@@ -83,6 +88,15 @@ void ObserverServer::RemoveObserverOptions(const std::string& name, size_t index
             break;
     }
     mInputConfigMap.erase(key);
+}
+
+void ObserverServer::Init() {
+    std::call_once(once_, &InitBPF);
+}
+
+void ObserverServer::InitBPF() {
+    sm_ = logtail::ebpf::source_manager();
+    sm_.initPlugin("/usr/local/ilogtail/libsockettrace.so", "");
 }
 
 } // namespace logtail
