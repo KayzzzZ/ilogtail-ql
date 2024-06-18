@@ -30,7 +30,7 @@ bool InputEbpfFileObserver::Init(const Json::Value& config, uint32_t& pluginIdx,
 
 bool InputEbpfFileObserver::Start() {
     ObserverServer::GetInstance()->AddObserverOptions(mContext->GetConfigName(), mIndex, &mObserverOptions, mContext);
-    ObserverServer::GetInstance()->Start();
+    ObserverServer::GetInstance()->Start(BPFObserverPipelineType::PIPELINE_FILE);
     return true;
 }
 
