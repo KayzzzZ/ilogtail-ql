@@ -19,11 +19,15 @@
 #include <thread>
 #include <mutex>
 #include <iostream>
+#include <memory>
+#include <chrono>
 
 namespace logtail {
 
 // 负责接收ebpf返回的数据，然后将数据推送到对应的队列中
 // TODO: 目前暂时没有考虑并发Start的问题
+
+// input 代码 + 联调安全
 void SecurityServer::Start(BPFSecurityPipelineType type) {
     if (mIsRunning) {
         return;
@@ -57,14 +61,17 @@ void SecurityServer::AddSecurityOptions(const std::string& name,
     switch (options->mFilterType) {
         case SecurityFilterType::FILE: {
             // TODO: ebpf_start(type);
+            fileConfig_ = std::make_pair(options, ctx);
             break;
         }
         case SecurityFilterType::PROCESS: {
             // TODO: ebpf_start(type);
+            processConfig_ = std::make_pair(options, ctx);
             break;
         }
         case SecurityFilterType::NETWORK: {
             // TODO: ebpf_start(type);
+            networkConfig_ = std::make_pair(options, ctx);
             break;
         }
         default:
@@ -79,14 +86,17 @@ void SecurityServer::RemoveSecurityOptions(const std::string& name, size_t index
     switch (mInputConfigMap[key].first->mFilterType) {
         case SecurityFilterType::FILE: {
             // TODO: ebpf_stop(type);
+            fileConfig_ = std::make_pair(nullptr, nullptr);
             break;
         }
         case SecurityFilterType::PROCESS: {
             // TODO: ebpf_stop(type);
+            processConfig_ = std::make_pair(nullptr, nullptr);
             break;
         }
         case SecurityFilterType::NETWORK: {
             // TODO: ebpf_stop(type);
+            networkConfig_ = std::make_pair(nullptr, nullptr);
             break;
         }
         default:
@@ -102,9 +112,53 @@ void SecurityServer::Init() {
 void SecurityServer::InitBPF() {
     sm_ = logtail::ebpf::source_manager();
     sm_.initPlugin("/usr/local/ilogtail/libsockettrace_secure.so", "");
+    this->flag_ = true;
+    core_thread_ = std::thread(&CollectEvents, this);
+}
+
+void SecurityServer::StopBPF() {
+    sm_.clearPlugin();
+    this->flag_ = false;
+    if (core_thread_.joinable()) {
+        core_thread_.join();
+    }
 }
 
 void SecurityServer::CollectEvents() {
+    // std::unique_ptr<ProcessQueueItem> item
+    //     = std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(group), inputIndex));
+    // for (size_t i = 0; i < retryTimes; ++i) {
+    //     if (ProcessQueueManager::GetInstance()->PushQueue(key, std::move(item)) == 0) {
+    //         return true;
+    //     }
+    //     if (i % 100 == 0) {
+    //         LOG_WARNING(sLogger,
+    //                     ("push attempts to process queue continuously failed for the past second",
+    //                      "retry again")("config", QueueKeyManager::GetInstance()->GetName(key))("input index",
+    //                                                                                             ToString(inputIndex)));
+    //     }
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    // }
+    while (flag_) {
+        if (this->processConfig_.second == nullptr) continue;
+
+        auto ctx = this->processConfig_.second;
+        auto source_buffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup group(source_buffer);
+
+        for (int i = 0; i < 10; i ++ ) {
+            auto event = group.AddLogEvent();
+            event->SetContentNoCopy("qianlu", "test");
+            event->SetContentNoCopy("key1", "value1");
+            event->SetContentNoCopy("key2", "value2");
+            event->SetContentNoCopy("key3", "value3");
+        }
+        std::unique_ptr<ProcessQueueItem> item = 
+                std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(group), 0));
+        ProcessQueueManager::GetInstance()->PushQueue(ctx->GetProcessQueueKey(), std::move(item));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+
     // get ops and config
     // auto securityConfigMap = this->mInputConfigMap[0];
     // auto m_ctx = securityConfigMap.second;

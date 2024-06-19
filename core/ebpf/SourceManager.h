@@ -94,7 +94,7 @@ public:
         // fill init_param
         init_param_t* config = new init_param_t;
         // TODO @qianlu.kk make it configurable .. 
-        config->so = "/usr/local/ilogtail/libsockettrace.so";
+        config->so = libPath;
         config->so_size = config->so.length();
         Dl_info dlinfo;
         int err;

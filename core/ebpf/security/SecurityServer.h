@@ -63,6 +63,7 @@ private:
 
     void Init();
     void InitBPF();
+    void StopBPF();
     void CollectEvents();
 
     bool mIsRunning = false;
@@ -71,6 +72,12 @@ private:
     // std::unordered_map<pair<std::string, size_t>, const pointer*> mEbpfPointerMap;
     logtail::ebpf::source_manager sm_;
     std::once_flag once_;
+    std::thread core_thread_;
+    volatile int flag_;
+
+    SecurityConfig networkConfig_;
+    SecurityConfig processConfig_;
+    SecurityConfig fileConfig_;
 };
 
 } // namespace logtail
