@@ -113,7 +113,7 @@ void SecurityServer::InitBPF() {
     sm_ = logtail::ebpf::source_manager();
     sm_.initPlugin("/usr/local/ilogtail/libsockettrace_secure.so", "");
     this->flag_ = true;
-    core_thread_ = std::thread(&CollectEvents, this);
+    core_thread_ = std::thread(&SecurityServer::CollectEvents, this);
 }
 
 void SecurityServer::StopBPF() {
