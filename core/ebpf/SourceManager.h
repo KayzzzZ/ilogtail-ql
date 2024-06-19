@@ -70,10 +70,10 @@ public:
       // load libsockettrace.so
       handle = dlopen(libPath.c_str(), RTLD_NOW);
       if (!handle) {
-        std::cerr << "dlopen error: " << dlerror() << std::endl;
+        std::cerr << "[SourceManager] dlopen error: " << dlerror() << std::endl;
         return false;
       }
-      std::cout << "successfully open" << std::endl;
+      std::cout << "[SourceManager] successfully open " << libPath << std::endl;
 
       initPluginFunc = (init_func)dlsym(handle, "init");
       callFunc = (call_func)dlsym(handle, "call");
@@ -84,7 +84,7 @@ public:
         dlclose(handle);
         return false;
       } else {
-        std::cout << "succesfully get init/call/deinit func address" << std::endl;
+        std::cout << "[SourceManager] succesfully get init/call/deinit func address for " << libPath << std::endl;
       }
 
       void* init_param = nullptr;
@@ -93,54 +93,70 @@ public:
 
         // fill init_param
         init_param_t* config = new init_param_t;
-        config->so = libPath;
+        // TODO @qianlu.kk make it configurable .. 
+        config->so = "/usr/local/ilogtail/libsockettrace.so";
         config->so_size = config->so.length();
         Dl_info dlinfo;
         int err;
         void* cleanup_dog_ptr = dlsym(handle, "ebpf_cleanup_dog");
         if (nullptr == cleanup_dog_ptr) {
-          std::cout << "get ebpf_cleanup_dog address failed!" << std::endl;
+          std::cout << "[SourceManager] get ebpf_cleanup_dog address failed!" << std::endl;
         } else {
-          std::cout << "successfully get ebpf_cleanup_dog address" << std::endl;
+          std::cout << "[SourceManager] successfully get ebpf_cleanup_dog address" << std::endl;
         }
         err = dladdr(cleanup_dog_ptr, &dlinfo);
         if (!err)
         {
-          printf("ebpf_cleanup_dog laddr failed, err:%s\n", strerror(err));
+          printf("[SourceManager] ebpf_cleanup_dog laddr failed, err:%s\n", strerror(err));
         } else {
-          std::cout << "successfully get ebpf_cleanup_dog dlinfo" << std::endl;
+          config->uprobe_offset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
+          std::cout << "[SourceManager] successfully get ebpf_cleanup_dog dlinfo, uprobe_offset:" << config->uprobe_offset << std::endl;
         }
 
         void* ebpf_update_conn_addr_ptr = dlsym(handle, "ebpf_update_conn_addr");
         if (nullptr == ebpf_update_conn_addr_ptr) {
-          std::cout << "get ebpf_update_conn_addr address failed!" << std::endl;
+          std::cout << "[SourceManager] get ebpf_update_conn_addr address failed!" << std::endl;
         } else {
-          std::cout << "successfully get ebpf_update_conn_addr address" << std::endl;
+          std::cout << "[SourceManager] successfully get ebpf_update_conn_addr address" << std::endl;
         }
-        config->uprobe_offset  = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
         err = dladdr(ebpf_update_conn_addr_ptr, &dlinfo);
         if (!err)
         {
-          printf("ebpf_update_conn_addr laddr failed, err:%s\n", strerror(err));
+          printf("[SourceManager] ebpf_update_conn_addr laddr failed, err:%s\n", strerror(err));
         } else {
-          std::cout << "successfully get ebpf_update_conn_addr dlinfo" << std::endl;
+          config->upca_offset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
+          std::cout << "[SourceManager] successfully get ebpf_update_conn_addr dlinfo, upca_offset" << config->upca_offset << std::endl;
         }
 
         void* ebpf_disable_process_ptr = dlsym(handle, "ebpf_disable_process");
         if (nullptr == ebpf_disable_process_ptr) {
-          std::cout << "get ebpf_disable_process address failed!" << std::endl;
+          std::cout << "[SourceManager] get ebpf_disable_process address failed!" << std::endl;
         } else {
-          std::cout << "successfully get ebpf_disable_process address" << std::endl;
+          std::cout << "[SourceManager] successfully get ebpf_disable_process address" << std::endl;
         }
-        config->upca_offset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
         err = dladdr(ebpf_disable_process_ptr, &dlinfo);
         if (!err)
         {
-          printf("ebpf_disable_process laddr failed, err:%s\n", strerror(err));
+          printf("[SourceManager] ebpf_disable_process laddr failed, err:%s\n", strerror(err));
         } else {
-          std::cout << "successfully get ebpf_disable_process dlinfo" << std::endl;
+          config->upps_offset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
+          std::cout << "[SourceManager] successfully get ebpf_disable_process dlinfo, upps_offset:" << config->upps_offset << std::endl;
         }
-        config->upps_offset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
+
+        void* ebpf_update_conn_role_ptr = dlsym(handle, "ebpf_update_conn_role");
+        if (nullptr == ebpf_update_conn_role_ptr) {
+          std::cout << "[SourceManager] get ebpf_update_conn_role address failed!" << std::endl;
+        } else {
+          std::cout << "[SourceManager] successfully get ebpf_update_conn_role address" << std::endl;
+        }
+        err = dladdr(ebpf_update_conn_role_ptr, &dlinfo);
+        if (!err)
+        {
+          printf("[SourceManager] ebpf_update_conn_role laddr failed, err:%s\n", strerror(err));
+        } else {
+          config->upcr_offset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
+          std::cout << "[SourceManager] successfully get ebpf_update_conn_role dlinfo, upcr_offset:" << config->upcr_offset << std::endl;
+        }
         init_param = (void*)config;
       }
 

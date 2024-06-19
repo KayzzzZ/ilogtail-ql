@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "ebpf/security/SecurityServer.h"
+#include "queue/ProcessQueueManager.h"
+#include "queue/ProcessQueueItem.h"
 
 #include <thread>
 #include <mutex>
@@ -100,6 +102,20 @@ void SecurityServer::Init() {
 void SecurityServer::InitBPF() {
     sm_ = logtail::ebpf::source_manager();
     sm_.initPlugin("/usr/local/ilogtail/libsockettrace_secure.so", "");
+}
+
+void SecurityServer::CollectEvents() {
+    // get ops and config
+    // auto securityConfigMap = this->mInputConfigMap[0];
+    // auto m_ctx = securityConfigMap.second;
+    // auto key = m_ctx->GetProcessQueueKey();
+    // auto item = std::make_unique<ProcessQueueItem>();
+    // for (int i = 0 ; i < 1000; i ++ ) {
+    //     auto event = item->mEventGroup.AddLogEvent();
+
+    //     event->SetContent("aa", "aa");
+    // }
+    // ProcessQueueManager::GetInstance()->PushQueue(key, std::move(item));
 }
 
 } // namespace logtail

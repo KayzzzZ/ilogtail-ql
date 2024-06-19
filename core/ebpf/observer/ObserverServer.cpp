@@ -104,4 +104,8 @@ void ObserverServer::InitBPF() {
     sm_.initPlugin("/usr/local/ilogtail/libsockettrace.so", "");
 }
 
+void ObserverServer::CollectEvents() {
+    
+}
+
 } // namespace logtail

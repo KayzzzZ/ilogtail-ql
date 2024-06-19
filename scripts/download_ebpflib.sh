@@ -31,6 +31,6 @@ echo "cn_time_connect=$cn_time_connect us_time_connect=$us_time_connect OSS_REGI
 
 curl -sfL -m 30 https://$OSS_REGION/kubernetes/libebpf.so -o ${DOWNLOAD_DIR}/libebpf.so
 
-curl -sfL -m 30 https://ebpf-driver-deps.oss-us-west-1.aliyuncs.com/agent-libs/libsockettrace_secure.so -o ${DOWNLOAD_DIR}/libsockettrace_secure.so
-curl -sfL -m 30 https://ebpf-driver-deps.oss-us-west-1.aliyuncs.com/agent-libs/libsockettrace.so -o ${DOWNLOAD_DIR}/libsockettrace.so
-curl -sfL -m 30 https://ebpf-driver-deps.oss-us-west-1.aliyuncs.com/agent-libs/libcoolbpf.so.1.0.0 -o ${DOWNLOAD_DIR}/libcoolbpf.so.1.0.0
+curl -sfL -m 30 https://sysak-libs.oss-ap-southeast-1.aliyuncs.com/libsockettrace_secure.so -o ${DOWNLOAD_DIR}/libsockettrace_secure.so
+curl -sfL -m 30 https://sysak-libs.oss-ap-southeast-1.aliyuncs.com/libsockettrace.so -o ${DOWNLOAD_DIR}/libsockettrace.so
+curl -sfL -m 30 https://sysak-libs.oss-ap-southeast-1.aliyuncs.com/libcoolbpf.so.1.0.0 -o ${DOWNLOAD_DIR}/libcoolbpf.so.1.0.0
