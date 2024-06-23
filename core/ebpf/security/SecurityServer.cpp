@@ -15,12 +15,16 @@
 #include "ebpf/security/SecurityServer.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/ProcessQueueItem.h"
+#include "common/MachineInfoUtil.h"
+#include "common/LogtailCommonFlags.h"
 
 #include <thread>
 #include <mutex>
 #include <iostream>
 #include <memory>
 #include <chrono>
+#include <functional>
+
 
 namespace logtail {
 
@@ -112,6 +116,7 @@ void SecurityServer::Init() {
 void SecurityServer::HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEvent> event) {
     if (event == nullptr) return;
 
+    // TODO @qianlu.kk merge multi events into a group
     auto ctx = this->processConfig_.second;
     auto source_buffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup group(source_buffer);
@@ -131,15 +136,25 @@ void SecurityServer::InitBPF() {
     sm_ = logtail::ebpf::source_manager();
     sm_.initPlugin("/usr/local/ilogtail/libsockettrace_secure.so", "");
     this->flag_ = true;
-    core_thread_ = std::thread(&SecurityServer::CollectEvents, this);
+    std::shared_ptr<SecureConfig> config = std::make_shared<SecureConfig>();
+    // get host prefix
+    config->host_path_prefix_ = STRING_FLAG(default_container_host_path);
+    // get host name
+    config->host_name_ = GetHostName();
+    // get host ip
+    config->host_ip_ = GetHostIp();
+    // set callback
+    config->cb_ = std::bind(&SecurityServer::HandleProcessSecureEvent, this, std::placeholders::_1);
+    // TODO deliver config to 
+    // core_thread_ = std::thread(&SecurityServer::CollectEvents, this);
 }
 
 void SecurityServer::StopBPF() {
     sm_.clearPlugin();
     this->flag_ = false;
-    if (core_thread_.joinable()) {
-        core_thread_.join();
-    }
+    // if (core_thread_.joinable()) {
+    //     core_thread_.join();
+    // }
 }
 
 void SecurityServer::CollectEvents() {

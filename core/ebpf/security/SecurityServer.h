@@ -63,7 +63,7 @@ private:
     SecurityServer() = default;
     ~SecurityServer() = default;
 
-    void HandleSecureEvent(std::unique_ptr<AbstractSecurityEvent> event);
+    void HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEvent> event);
 
     void Init();
     void InitBPF();
