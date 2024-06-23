@@ -21,10 +21,12 @@
 #include <utility>
 #include <mutex>
 #include <thread>
+#include <memory>
 
 #include "ebpf/security/SecurityOptions.h"
 #include "pipeline/PipelineContext.h"
 #include "ebpf/SourceManager.h"
+#include "SecurityAPI.h"
 
 namespace logtail {
 
@@ -60,6 +62,8 @@ public:
 private:
     SecurityServer() = default;
     ~SecurityServer() = default;
+
+    void HandleSecureEvent(std::unique_ptr<AbstractSecurityEvent> event);
 
     void Init();
     void InitBPF();

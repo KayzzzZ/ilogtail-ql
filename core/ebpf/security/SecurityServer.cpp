@@ -109,6 +109,24 @@ void SecurityServer::Init() {
     std::call_once(once_, std::bind(&SecurityServer::InitBPF, this));
 }
 
+void SecurityServer::HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEvent> event) {
+    if (event == nullptr) return;
+
+    auto ctx = this->processConfig_.second;
+    auto source_buffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup group(source_buffer);
+    auto log_event = group.AddLogEvent();
+    auto tags = event->GetAllTags();
+    for (auto tag : tags) {
+        log_event->SetContent(tag.first, tag.second);
+    }
+
+    std::unique_ptr<ProcessQueueItem> item = 
+            std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(group), 0));
+    ProcessQueueManager::GetInstance()->PushQueue(ctx->GetProcessQueueKey(), std::move(item));
+
+}
+
 void SecurityServer::InitBPF() {
     sm_ = logtail::ebpf::source_manager();
     sm_.initPlugin("/usr/local/ilogtail/libsockettrace_secure.so", "");
@@ -146,13 +164,15 @@ void SecurityServer::CollectEvents() {
         auto source_buffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup group(source_buffer);
 
-        for (int i = 0; i < 10; i ++ ) {
-            auto event = group.AddLogEvent();
-            event->SetContentNoCopy("qianlu", "test");
-            event->SetContentNoCopy("key1", "value1");
-            event->SetContentNoCopy("key2", "value2");
-            event->SetContentNoCopy("key3", "value3");
-        }
+        // for (int i = 0; i < 10; i ++ ) {
+        //     auto event = group.AddLogEvent();
+        //     event->SetContentNoCopy("qianlu", "test");
+        //     event->SetContentNoCopy("key1", "value1");
+        //     event->SetContentNoCopy("key2", "value2");
+        //     event->SetContentNoCopy("key3", "value3");
+
+        //     auto spanEvent = group.AddSpanEvent();
+        // }
         std::unique_ptr<ProcessQueueItem> item = 
                 std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(group), 0));
         ProcessQueueManager::GetInstance()->PushQueue(ctx->GetProcessQueueKey(), std::move(item));
