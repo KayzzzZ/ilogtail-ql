@@ -6,6 +6,7 @@
 #include <thread>
 #include <chrono>
 #include <cstring>
+#include "security/SecurityAPI.h"
 
 namespace logtail {
 namespace ebpf {
@@ -66,7 +67,7 @@ public:
         clearPlugin();
     }
 
-    bool initPlugin(const std::string& libPath, const std::string& soPath) {
+    bool initPlugin(const std::string& libPath, void* rawConfig) {
       // load libsockettrace.so
       handle = dlopen(libPath.c_str(), RTLD_NOW);
       if (!handle) {
@@ -158,6 +159,8 @@ public:
           std::cout << "[SourceManager] successfully get ebpf_update_conn_role dlinfo, upcr_offset:" << config->upcr_offset << std::endl;
         }
         init_param = (void*)config;
+      } else if (std::string::npos != libPath.find("_secure.so")) {
+        init_param = rawConfig;
       }
 
       initPluginFunc(init_param);

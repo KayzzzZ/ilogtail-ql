@@ -101,7 +101,7 @@ void ObserverServer::Init() {
 
 void ObserverServer::InitBPF() {
     sm_ = logtail::ebpf::source_manager();
-    sm_.initPlugin("/usr/local/ilogtail/libsockettrace.so", "");
+    sm_.initPlugin("/usr/local/ilogtail/libsockettrace.so", nullptr);
 }
 
 void ObserverServer::CollectEvents() {

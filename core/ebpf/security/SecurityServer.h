@@ -82,6 +82,8 @@ private:
     SecurityConfig networkConfig_;
     SecurityConfig processConfig_;
     SecurityConfig fileConfig_;
+
+    std::shared_ptr<SecureConfig> config_;
 };
 
 } // namespace logtail

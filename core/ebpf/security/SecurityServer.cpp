@@ -134,17 +134,22 @@ void SecurityServer::HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEv
 
 void SecurityServer::InitBPF() {
     sm_ = logtail::ebpf::source_manager();
-    sm_.initPlugin("/usr/local/ilogtail/libsockettrace_secure.so", "");
-    this->flag_ = true;
-    std::shared_ptr<SecureConfig> config = std::make_shared<SecureConfig>();
-    // get host prefix
-    config->host_path_prefix_ = STRING_FLAG(default_container_host_path);
+    config_ = std::make_shared<SecureConfig>();
+    std::string host_path_prefix = STRING_FLAG(default_container_host_path);
+    std::cout << "[SecurityServer] host_path_prefix from flag is:" << host_path_prefix << std::endl;
+    config_->host_path_prefix_ = "/logtail_host";
     // get host name
-    config->host_name_ = GetHostName();
+    config_->host_name_ = GetHostName();
     // get host ip
-    config->host_ip_ = GetHostIp();
+    config_->host_ip_ = GetHostIp();
     // set callback
-    config->cb_ = std::bind(&SecurityServer::HandleProcessSecureEvent, this, std::placeholders::_1);
+    config_->cb_ = std::bind(&SecurityServer::HandleProcessSecureEvent, this, std::placeholders::_1);
+    sm_.initPlugin("/usr/local/ilogtail/libsockettrace_secure.so", config_.get());
+    this->flag_ = true;
+
+    // get host prefix
+    // config->host_path_prefix_ = STRING_FLAG(default_container_host_path);
+
     // TODO deliver config to 
     // core_thread_ = std::thread(&SecurityServer::CollectEvents, this);
 }
