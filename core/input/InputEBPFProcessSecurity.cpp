@@ -29,7 +29,7 @@ bool InputEBPFProcessSecurity::Init(const Json::Value& config, uint32_t& pluginI
 
 bool InputEBPFProcessSecurity::Start() {
     SecurityServer::GetInstance()->AddSecurityOptions(mContext->GetConfigName(), mIndex, &mSecurityOptions, mContext);
-    SecurityServer::GetInstance()->Start();
+    SecurityServer::GetInstance()->Start(BPFSecurityPipelineType::PIPELINE_PROCESS);
     return true;
 }
 

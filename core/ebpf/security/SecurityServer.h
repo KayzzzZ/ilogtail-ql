@@ -19,11 +19,24 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <mutex>
+#include <thread>
+#include <memory>
 
 #include "ebpf/security/SecurityOptions.h"
 #include "pipeline/PipelineContext.h"
+#include "ebpf/SourceManager.h"
+#include "SecurityAPI.h"
 
 namespace logtail {
+
+enum class BPFSecurityPipelineType {
+    UNKNOWN,
+    PIPELINE_PROCESS,
+    PIPELINE_NETWORK,
+    PIPELINE_FILE,
+    MAX,
+};
 
 class SecurityServer {
 public:
@@ -35,7 +48,8 @@ public:
         return &instance;
     }
 
-    void Start();
+    void Start(BPFSecurityPipelineType);
+    void Stop(BPFSecurityPipelineType);
     void Stop();
 
     // 其他函数注册：配置注册、注销等
@@ -49,10 +63,27 @@ private:
     SecurityServer() = default;
     ~SecurityServer() = default;
 
+    void HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEvent> event);
+
+    void Init();
+    void InitBPF();
+    void StopBPF();
+    void CollectEvents();
+
     bool mIsRunning = false;
     // TODO: 目前配置更新时，会停止ebpf探针、重新加载配置、重新启动ebpf探针，后续优化时需要考虑这里的并发问题
     std::unordered_map<std::string, SecurityConfig> mInputConfigMap;
     // std::unordered_map<pair<std::string, size_t>, const pointer*> mEbpfPointerMap;
+    logtail::ebpf::source_manager sm_;
+    std::once_flag once_;
+    std::thread core_thread_;
+    volatile int flag_;
+
+    SecurityConfig networkConfig_;
+    SecurityConfig processConfig_;
+    SecurityConfig fileConfig_;
+
+    std::shared_ptr<SecureConfig> config_;
 };
 
 } // namespace logtail

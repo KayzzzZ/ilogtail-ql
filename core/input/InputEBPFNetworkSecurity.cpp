@@ -30,7 +30,7 @@ bool InputEBPFNetworkSecurity::Init(const Json::Value& config, uint32_t& pluginI
 
 bool InputEBPFNetworkSecurity::Start() {
     SecurityServer::GetInstance()->AddSecurityOptions(mContext->GetConfigName(), mIndex, &mSecurityOptions, mContext);
-    SecurityServer::GetInstance()->Start();
+    SecurityServer::GetInstance()->Start(BPFSecurityPipelineType::PIPELINE_NETWORK);
     return true;
 }
 
