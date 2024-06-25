@@ -5,6 +5,10 @@
 #include "serializer/ArmsSerializer.h"
 
 #include "arms_metrics_pb/MeasureBatches.pb.h"
+#include "span_pb/trace.pb.h"
+#include "models/PipelineEvent.h"
+#include "models/SpanEvent.h"
+#include "models/MetricEvent.h"
 
 const std::map<std::string, proto::EnumUnit> metricUnitMap{
     {"arms_rpc_requests_count", proto::EnumUnit::COUNT},
@@ -172,5 +176,75 @@ std::string ArmsMetricsEventGroupListSerializer::GetAppIdFromTags(SizedMap& mTag
     return "unkown";
 }
 
+
+///////////////////////////////////////////////// Span Serializer /////////////////////////////////////////////////
+
+bool ArmsSpanEventGroupListSerializer::Serialize(std::vector<BatchedEventsList>&& v, 
+                std::string& res, 
+                std::string& errorMsg) {
+    
+    TracesData traces_data;
+    
+    // set resource 
+    ResourceSpans* resource_spans = traces_data.add_resource_spans();
+    auto resource = resource_spans->mutable_resource();
+    for (auto &it : common_resources_) {
+        auto attr = resource->add_attributes();
+        attr->set_key(it.first);
+        auto val = attr->mutable_value();
+        val->set_string_value(it.second);
+    }
+
+    auto scope_span = resource_spans->add_scope_spans();
+
+    // TODO @qianlu.kk unnecessary
+    auto scope = scope_span->mutable_scope();
+    scope->set_name("");
+
+    for (auto& batched_events_list : v) {
+        for (auto &batch_events : batched_events_list) {
+            auto all_tags = batch_events.mTags.mInner;
+            
+            for (auto &event_ptr : batch_events.mEvents) {
+                if (!event_ptr.Is<SpanEvent>()) continue;
+
+                // !!! attention !!! @qianlu.kk
+                // SpanEvent should not hold any tags because we don't have interface to extract thoes tags
+                // so, all tags need to be stored in `batch_events::mTags` 
+
+                SpanEvent& span_event_ref = event_ptr.Cast<SpanEvent>();
+                
+                // add to scope spans
+                auto span = scope_span->add_spans();
+                span->set_trace_id(std::string(span_event_ref.GetTraceId()));
+                span->set_span_id(std::string(span_event_ref.GetSpanId()));
+                span->set_parent_span_id(std::string(span_event_ref.GetParentSpanId()));
+                span->set_kind(static_cast<Span_SpanKind>(span_event_ref.GetKind()));
+                span->set_start_time_unix_nano(span_event_ref.GetStartTimeNs());
+                span->set_end_time_unix_nano(span_event_ref.GetEndTimeNs());
+                span->set_name(std::string(span_event_ref.GetName()));
+
+                // TODO @qianlu.kk this logic need to be move to upper ...
+                // but protobuf may be NOT support memory reuse ... 
+                for (auto it : all_tags) {
+                    // set attrs
+                    auto key = it.first;
+                    auto val = it.second;
+                    auto attr = span->add_attributes();
+                    attr->set_key(std::string(it.first));
+                    auto attr_val = attr->mutable_value();
+                    attr_val->set_string_value(std::string(it.second));
+                }
+            }
+        }
+    }
+
+    res = traces_data.SerializeAsString();
+    
+    return true;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 } // namespace logtail
