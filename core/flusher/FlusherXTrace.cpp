@@ -95,6 +95,29 @@ bool FlusherXTraceSpan::Init(const Json::Value& config, Json::Value& optionalGoP
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
     }
+    // AppId
+    if (!GetOptionalStringParam(config, "AppId", app_id_, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              region_,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+    common_resources_ = {
+            {"arms.appId", app_id_},
+            {"arms.regionId", region_},
+            {"service.name", "mall-user-server"},
+            {"host.name", GetHostName()},
+            {"host.ip", GetHostIp()},
+            {"app.type", "ebpf"},
+            {"cluster.id", "@qianlu.kk TODO"},
+            {"telemetry.sdk.name", "oneagent"},
+            {"telemetry.sdk.version", "ebpf"},
+        };
 
     // init compressor
     compressor_ = CompressorFactory::GetInstance()->Create(config, *mContext, sName, CompressType::SNAPPY);
@@ -109,6 +132,9 @@ bool FlusherXTraceSpan::Init(const Json::Value& config, Json::Value& optionalGoP
     }
     LOG_INFO(sLogger, ("[XTraceFlusher] init info: ", "xtrace flusher init successful !")); 
 
+    auto mLogstoreKey = GenerateLogstoreFeedBackKey("arms_span_proj", "arms_span_proj");
+    mSenderQueue = Sender::Instance()->GetSenderQueue(mLogstoreKey);
+
     return true;
 }
 
@@ -121,27 +147,30 @@ bool FlusherXTraceSpan::Unregister(bool isPipelineRemoving) {
 }
 
 void FlusherXTraceSpan::Send(PipelineEventGroup&& g) {
+    LOG_INFO(sLogger, ("[Send] ", " enter "));
     std::vector<BatchedEventsList> res;
     batcher_.Add(std::move(g), res);
     SerializeAndPush(std::move(res));
 }
 void FlusherXTraceSpan::Flush(size_t key) {
+    LOG_INFO(sLogger, ("[Flush] ", " enter "));
     BatchedEventsList res;
     batcher_.FlushQueue(key, res);
     SerializeAndPush(std::move(res));
 }
 void FlusherXTraceSpan::FlushAll() {
+    LOG_INFO(sLogger, ("[FlushAll] ", " enter "));
     std::vector<BatchedEventsList> res;
     batcher_.FlushAll(res);
     SerializeAndPush(std::move(res));
 }
 
 void FlusherXTraceSpan::SerializeAndPush(BatchedEventsList&& groupList) {
-
+    LOG_INFO(sLogger, ("[SerializeAndPush] BatchedEventsList ", " enter??? "));
 }
 
 void FlusherXTraceSpan::SerializeAndPush(std::vector<BatchedEventsList>&& groupLists) {
-    LOG_INFO(sLogger, ("SerializeAndPush :", "start to serialed res info"));
+    LOG_INFO(sLogger, ("[Span][SerializeAndPush] std::vector<BatchedEventsList> enter, size", groupLists.size()));
     LOG_INFO(sLogger, ("SerializeAndPush groupLists size :", groupLists.size()));
     std::string serializedData, compressedData, serializeErrMsg;
     serializer_.Serialize(std::move(groupLists), serializedData, serializeErrMsg);
@@ -176,29 +205,32 @@ void FlusherXTraceSpan::SerializeAndPush(std::vector<BatchedEventsList>&& groupL
 }
 
 std::string FlusherXTraceSpan::GetXtraceEndpoint() const {
+    std::string endpoint = "arms-dc-hz.aliyuncs.com";
     auto it = endpoints_.find(region_);
-    if (it == endpoints_.end()) {
-        return "arms-dc-hz.aliyuncs.com";
-    } else {
-        return it->second;
+    if (it != endpoints_.end()) {
+        endpoint = it->second;
     }
+    return endpoint;
 }
 
 std::string FlusherXTraceSpan::GetXtraceUrl() const {
-    return "/api/v1/arms/otel/" + license_key_ + "/" + app_id_;
+    std::string url = "/api/v1/arms/otel/" + license_key_ + "/" + app_id_;
+    LOG_INFO(sLogger, ("[GetXtraceUrl] url", url));
+    return url;
 }
 
 sdk::AsynRequest* FlusherXTraceSpan::BuildRequest(SenderQueueItem* item) const {
     std::map<std::string, std::string> httpHeader;
-    httpHeader[logtail::sdk::CONTENT_TYPE] = "text/plain";
+    httpHeader[logtail::sdk::CONTENT_TYPE] = "application/x-protobuf";
+    // TODO @qianlu.kk 
     httpHeader["licenseKey"] = license_key_;
     httpHeader["content.type"] = "span";
-    httpHeader["content.encoding"] = "snappy";
+    httpHeader["X-ARMS-Encoding"] = "snappy";
     httpHeader["data.type"] = "";
     std::string compressBody = item->mData;
     std::string HTTP_POST = "POST";
-    auto host = GetXtraceEndpoint();
-    std::string url = GetXtraceUrl();
+    auto host = GetXtraceEndpoint(); // arms-dc-bj-internal.aliyuncs.com
+    std::string url = GetXtraceUrl(); // /api/v1/arms/otel/awy7aw18hz@2694ecf80a44b70/awy7aw18hz@72e78405b0019f2
     int32_t port = 80;
     // TODO @qianlu add query string
     std::string queryString = "";

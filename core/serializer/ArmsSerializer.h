@@ -38,7 +38,8 @@ class ArmsSpanEventGroupListSerializer : public Serializer<std::vector<BatchedEv
 public:
     ArmsSpanEventGroupListSerializer(Flusher* f) : Serializer<std::vector<BatchedEventsList>>(f) {
         common_resources_ = {
-            {"service.name", "cmonitor"},
+            {"arms.regionId", "cn-beijing"},
+            {"service.name", "mall-user-server"},
             {"host.name", GetHostName()},
             {"host.ip", GetHostIp()},
             {"app.type", "ebpf"},

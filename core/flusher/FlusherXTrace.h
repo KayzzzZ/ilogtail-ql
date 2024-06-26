@@ -31,6 +31,7 @@ public:
     void Flush(size_t key) override;
     void FlushAll() override;
     sdk::AsynRequest* BuildRequest(SenderQueueItem* item) const override;
+    std::map<std::string, std::string> GetCommonResources();
 
     static const std::string sName;
 
@@ -51,6 +52,7 @@ private:
 
     std::unique_ptr<Compressor> compressor_;
     ArmsSpanEventGroupListSerializer serializer_;
+    std::map<std::string, std::string> common_resources_;
 };
 
 }

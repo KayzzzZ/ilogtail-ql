@@ -9,6 +9,7 @@
 #include "models/PipelineEvent.h"
 #include "models/SpanEvent.h"
 #include "models/MetricEvent.h"
+#include "logger/Logger.h"
 
 const std::map<std::string, proto::EnumUnit> metricUnitMap{
     {"arms_rpc_requests_count", proto::EnumUnit::COUNT},
@@ -182,37 +183,45 @@ std::string ArmsMetricsEventGroupListSerializer::GetAppIdFromTags(SizedMap& mTag
 bool ArmsSpanEventGroupListSerializer::Serialize(std::vector<BatchedEventsList>&& v, 
                 std::string& res, 
                 std::string& errorMsg) {
+
+    LOG_INFO(sLogger, ("[Serialize] std::vector<BatchedEventsList> v.size ", v.size()));
+    
+    if (v.empty()) {
+        return true;
+    }
     
     TracesData traces_data;
     
     // set resource 
     ResourceSpans* resource_spans = traces_data.add_resource_spans();
     auto resource = resource_spans->mutable_resource();
-    for (auto &it : common_resources_) {
-        auto attr = resource->add_attributes();
-        attr->set_key(it.first);
-        auto val = attr->mutable_value();
-        val->set_string_value(it.second);
-    }
 
     auto scope_span = resource_spans->add_scope_spans();
 
     // TODO @qianlu.kk unnecessary
     auto scope = scope_span->mutable_scope();
-    scope->set_name("");
+    scope->set_name("hhh");
+    std::map<StringView, StringView> group_resource;
 
     for (auto& batched_events_list : v) {
         for (auto &batch_events : batched_events_list) {
-            auto all_tags = batch_events.mTags.mInner;
+            if (group_resource.empty()) {
+                group_resource = batch_events.mTags.mInner;
+            } else {
+                auto it1 = group_resource.find("arms.appId");
+                auto it2 = batch_events.mTags.mInner.find("arms.appId");
+                if (it1 != group_resource.end() && it2 != batch_events.mTags.mInner.end()) {
+                    LOG_INFO(sLogger, ("[Span][Serialize] group arms.appId tags equal ? ", it1->second == it2->second));
+                }
+            }
             
             for (auto &event_ptr : batch_events.mEvents) {
                 if (!event_ptr.Is<SpanEvent>()) continue;
-
                 // !!! attention !!! @qianlu.kk
                 // SpanEvent should not hold any tags because we don't have interface to extract thoes tags
                 // so, all tags need to be stored in `batch_events::mTags` 
-
                 SpanEvent& span_event_ref = event_ptr.Cast<SpanEvent>();
+                span_event_ref.GetEvents();
                 
                 // add to scope spans
                 auto span = scope_span->add_spans();
@@ -223,6 +232,8 @@ bool ArmsSpanEventGroupListSerializer::Serialize(std::vector<BatchedEventsList>&
                 span->set_start_time_unix_nano(span_event_ref.GetStartTimeNs());
                 span->set_end_time_unix_nano(span_event_ref.GetEndTimeNs());
                 span->set_name(std::string(span_event_ref.GetName()));
+
+                auto all_tags = span_event_ref.GetTags();
 
                 // TODO @qianlu.kk this logic need to be move to upper ...
                 // but protobuf may be NOT support memory reuse ... 
@@ -237,6 +248,18 @@ bool ArmsSpanEventGroupListSerializer::Serialize(std::vector<BatchedEventsList>&
                 }
             }
         }
+    }
+    for (auto &it : common_resources_) {
+        auto attr = resource->add_attributes();
+        attr->set_key(it.first);
+        auto val = attr->mutable_value();
+        val->set_string_value(it.second);
+    }
+    for (auto &it : group_resource) {
+        auto attr = resource->add_attributes();
+        attr->set_key(std::string(it.first));
+        auto val = attr->mutable_value();
+        val->set_string_value(std::string(it.second));
     }
 
     res = traces_data.SerializeAsString();

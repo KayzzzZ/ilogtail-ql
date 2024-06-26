@@ -35,7 +35,7 @@ public:
     static const std::string sName;
     FlusherArmsMetrics();
 
-    SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue() const { return mSenderQueue; }
+    // SingleLogstoreSenderManager<SenderQueueParam>* GetSenderQueue() const { return mSenderQueue; }
 
     std::string mProject;
     std::string mRegion;

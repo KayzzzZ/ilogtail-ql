@@ -19,6 +19,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <thread>
 
 #include "ebpf/observer/ObserverOptions.h"
 #include "pipeline/PipelineContext.h"
@@ -41,14 +42,22 @@ public:
     // 其他函数注册：配置注册、注销等
     void AddObserverOptions(const std::string& name,
                             size_t index,
-                            const ObserverOptions* options,
-                            const PipelineContext* ctx);
+                            ObserverOptions* options,
+                            PipelineContext* ctx);
     void RemoveObserverOptions(const std::string& name, size_t index);
+
+    void MetricGenerator();
 
 
 private:
     ObserverServer() = default;
     ~ObserverServer() = default;
+
+    PipelineContext* process_ctx_;
+    PipelineContext* file_ctx_;
+    PipelineContext* network_ctx_;
+
+    std::thread mock_thread_;
 
     bool mIsRunning = false;
     // TODO: 目前配置更新时，会停止ebpf探针、重新加载配置、重新启动ebpf探针，后续优化时需要考虑这里的并发问题

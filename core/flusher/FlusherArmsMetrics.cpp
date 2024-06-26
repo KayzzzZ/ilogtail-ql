@@ -20,7 +20,7 @@
 
 using namespace std;
 DEFINE_FLAG_INT32(arms_metrics_batch_send_interval, "batch sender interval (second)(default 3)", 3);
-DEFINE_FLAG_INT32(arms_metrics_merge_count_limit, "log count in one logGroup at most", 40000);
+DEFINE_FLAG_INT32(arms_metrics_merge_count_limit, "log count in one logGroup at most", 40000000);
 DEFINE_FLAG_INT32(arms_metrics_batch_send_metric_size,
                   "batch send metric size limit(bytes)(default 256KB)",
                   256 * 1024);
@@ -87,6 +87,9 @@ bool FlusherArmsMetrics::Init(const Json::Value& config, Json::Value& optionalGo
         LOG_WARNING(sLogger, ("mBatcher init info: ", "init err!"));
         return false;
     }
+
+    auto mLogstoreKey = GenerateLogstoreFeedBackKey("arms_metric_proj", "arms_metric_proj");
+    mSenderQueue = Sender::Instance()->GetSenderQueue(mLogstoreKey);
     LOG_INFO(sLogger, ("init info: ", "arms metrics init successful !"));
 
     return true;
@@ -146,6 +149,7 @@ void FlusherArmsMetrics::SerializeAndPush(BatchedEventsList&& groupList) {
 
 
 void FlusherArmsMetrics::SerializeAndPush(vector<BatchedEventsList>&& groupLists) {
+    LOG_INFO(sLogger, ("[Metrics][SerializeAndPush] std::vector<BatchedEventsList> size", groupLists.size()));
     string serializeArmsMetricData, compressedData, serializeErrMsg;
     mGroupListSerializer->Serialize(std::move(groupLists), serializeArmsMetricData, serializeErrMsg);
     size_t packageSize = 0;
