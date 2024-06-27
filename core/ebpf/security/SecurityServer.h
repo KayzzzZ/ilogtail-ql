@@ -59,11 +59,12 @@ public:
                             const PipelineContext* ctx);
     void RemoveSecurityOptions(const std::string& name, size_t index);
 
+    // handle process secure event
+    void HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEvent> event);
+
 private:
     SecurityServer() = default;
     ~SecurityServer() = default;
-
-    void HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEvent> event);
 
     void Init();
     void InitBPF();

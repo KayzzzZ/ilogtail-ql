@@ -25,6 +25,7 @@
 #include <chrono>
 #include <functional>
 
+DEFINE_FLAG_BOOL(secure_cb_use_class_method, "whether use class method as callback or not, default is true", true);
 
 namespace logtail {
 
@@ -113,12 +114,23 @@ void SecurityServer::Init() {
     std::call_once(once_, std::bind(&SecurityServer::InitBPF, this));
 }
 
+void HandleSecureEvent(std::unique_ptr<AbstractSecurityEvent> event) {
+    std::cout << "[SecurityServer] [HandleSecureEvent] Enter ~" << std::endl;
+    SecurityServer::GetInstance()->HandleProcessSecureEvent(std::move(event));
+    std::cout << "[SecurityServer] [HandleSecureEvent] Exit ~" << std::endl;
+    return;
+}
+
 void SecurityServer::HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEvent> event) {
     std::cout << "[SecurityServer] [HandleProcessSecureEvent] Enter ~" << std::endl;
     if (event == nullptr) {return;}
 
     // TODO @qianlu.kk merge multi events into a group
     auto ctx = this->processConfig_.second;
+    if (ctx == nullptr) {
+        std::cout << "[SecurityServer] [HandleProcessSecureEvent] ctx is null!" << std::endl;
+        return;
+    }
     auto source_buffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup group(source_buffer);
     auto log_event = group.AddLogEvent();
@@ -137,16 +149,23 @@ void SecurityServer::HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEv
 void SecurityServer::InitBPF() {
     sm_ = logtail::ebpf::source_manager();
     config_ = std::make_shared<SecureConfig>();
-    std::string host_path_prefix = STRING_FLAG(default_container_host_path);
-    std::cout << "[SecurityServer] host_path_prefix from flag is:" << host_path_prefix << std::endl;
-    config_->host_path_prefix_ = "/logtail_host";
+    config_->host_path_prefix_ = STRING_FLAG(default_container_host_path);
+    std::cout << "[SecurityServer] host_path_prefix from flag is:" << config_->host_path_prefix_ << std::endl;
+    // config_->host_path_prefix_ = "/logtail_host";
     // get host name
     config_->host_name_ = GetHostName();
     // get host ip
     config_->host_ip_ = GetHostIp();
     config_->enable_libbpf_debug_ = true;
     // set callback
-    config_->cb_ = std::bind(&SecurityServer::HandleProcessSecureEvent, this, std::placeholders::_1);
+    if (FLAGS_secure_cb_use_class_method) {
+        std::cout << "[SecurityServer] use class method as callback ... "<< std::endl;
+        config_->cb_ = std::bind(&SecurityServer::HandleProcessSecureEvent, this, std::placeholders::_1);
+    } else {
+        std::cout << "[SecurityServer] not use class method as callback ... "<< std::endl;
+        config_->cb_ = HandleSecureEvent;
+    }
+    
     sm_.initPlugin("/usr/local/ilogtail/libsockettrace_secure.so", config_.get());
     this->flag_ = true;
 
