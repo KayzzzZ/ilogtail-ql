@@ -2,8 +2,8 @@
 // Created by qianlu on 2024/6/19.
 //
 
-#ifndef SYSAK_EXPORT_H
-#define SYSAK_EXPORT_H
+#ifndef LOGTAIL_SYSAK_EXPORT_H
+#define LOGTAIL_SYSAK_EXPORT_H
 
 #include <vector>
 #include <string>
@@ -85,4 +85,4 @@ int handle_network_event(void* ctx, void* data);
 int handle_process_event(void* ctx, void* data);
 
 
-#endif //SYSAK_EXPORT_H
+#endif //LOGTAIL_SYSAK_EXPORT_H
