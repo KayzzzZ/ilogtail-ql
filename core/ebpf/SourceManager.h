@@ -1,193 +1,91 @@
+// Copyright 2023 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #pragma once
 
 #include <dlfcn.h>
 #include <iostream>
 #include <string>
+#include <vector>
+#include <map>
 #include <thread>
 #include <chrono>
 #include <cstring>
-#include "security/SecurityAPI.h"
+#include <atomic>
+
+#include "ebpf/include/ProcessApi.h"
+#include "ebpf/include/SysAkApi.h"
+#include "ebpf/include/SockettraceApi.h"
+#include "common/DynamicLibHelper.h"
 
 namespace logtail {
 namespace ebpf {
 
-
-const int NAME_SIZE = 64;
-const int INDEX_SIZE = 64;
-const int TABLE_SIZE = 64;
-
-struct unity_index {
-    char name[NAME_SIZE];
-    char index[INDEX_SIZE];
+enum class eBPFPluginType {
+  SOCKETTRACE = 0,
+  PROCESS = 1,
+  MAX = 2,
 };
 
-struct unity_value {
-    char name[NAME_SIZE];
-    double value;
-};
-
-struct unity_log {
-    char name[NAME_SIZE];
-    char* log;
-};
-
-struct unity_line {
-    char table[TABLE_SIZE];
-    struct unity_index indexs[4];
-    struct unity_value values[32];
-    struct unity_log logs[1];
-};
-
-struct unity_lines {
-    int num;
-    struct unity_line *line;
-};
-
-typedef struct init_param {
-  std::string btf;
-  int32_t btf_size;
-  std::string so;
-  int32_t so_size;
-  long uprobe_offset;
-  long upca_offset;
-  long upps_offset;
-  long upcr_offset;
-} init_param_t;
-
-using init_func = int (*)(void *);
-using call_func = int (*)(int, struct unity_lines *);
-using deinit_func = void (*)();
-
-
-class source_manager {
+class SourceManager {
 public:
-    source_manager() : handle(nullptr), initPluginFunc(nullptr), callFunc(nullptr), deinitPluginFunc(nullptr) {}
+    SourceManager(const SourceManager&) = delete;
+    SourceManager& operator=(const SourceManager&) = delete;
 
-    ~source_manager() {
-        clearPlugin();
+    static SourceManager* GetInstance() {
+        static SourceManager instance;
+        return &instance;
     }
 
-    bool initPlugin(const std::string& libPath, void* rawConfig) {
-      // load libsockettrace.so
-      handle = dlopen(libPath.c_str(), RTLD_NOW);
-      if (!handle) {
-        std::cerr << "[SourceManager] dlopen error: " << dlerror() << std::endl;
-        return false;
-      }
-      std::cout << "[SourceManager] successfully open " << libPath << std::endl;
+    bool DynamicLibLoadSucess(eBPFPluginType type);
 
-      initPluginFunc = (init_func)dlsym(handle, "init");
-      callFunc = (call_func)dlsym(handle, "call");
-      deinitPluginFunc = (deinit_func)dlsym(handle, "deinit");
+    bool LoadAndStartDynamicLib(eBPFPluginType type, void* config);
+    bool ReleaseDynamicLib(eBPFPluginType type);
+    void UpdateConfig(eBPFPluginType type, void* config);
 
-      if (!initPluginFunc || !callFunc || !deinitPluginFunc) {
-        std::cerr << "dlsym error: " << dlerror() << std::endl;
-        dlclose(handle);
-        return false;
-      } else {
-        std::cout << "[SourceManager] succesfully get init/call/deinit func address for " << libPath << std::endl;
-      }
+    bool LoadSockettraceProbe();
+    bool StartSockettraceProbe(SockettraceConfig* config);
+    bool UpdateSockettraceProbeConfig(SockettraceConfig* config);
+    bool StopSockettraceProbe();
 
-      void* init_param = nullptr;
-      if (std::string::npos != libPath.find("sockettrace.so")) {
-        // load function and address
+    bool LoadProcessProbe();
+    bool StartProcessProbe(SecureConfig* config);
+    bool UpdateProcessProbeConfig(SecureConfig* config);
+    bool StopProcessProbe();
 
-        // fill init_param
-        init_param_t* config = new init_param_t;
-        // TODO @qianlu.kk make it configurable .. 
-        config->so = libPath;
-        config->so_size = config->so.length();
-        Dl_info dlinfo;
-        int err;
-        void* cleanup_dog_ptr = dlsym(handle, "ebpf_cleanup_dog");
-        if (nullptr == cleanup_dog_ptr) {
-          std::cout << "[SourceManager] get ebpf_cleanup_dog address failed!" << std::endl;
-        } else {
-          std::cout << "[SourceManager] successfully get ebpf_cleanup_dog address" << std::endl;
-        }
-        err = dladdr(cleanup_dog_ptr, &dlinfo);
-        if (!err)
-        {
-          printf("[SourceManager] ebpf_cleanup_dog laddr failed, err:%s\n", strerror(err));
-        } else {
-          config->uprobe_offset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
-          std::cout << "[SourceManager] successfully get ebpf_cleanup_dog dlinfo, uprobe_offset:" << config->uprobe_offset << std::endl;
-        }
-
-        void* ebpf_update_conn_addr_ptr = dlsym(handle, "ebpf_update_conn_addr");
-        if (nullptr == ebpf_update_conn_addr_ptr) {
-          std::cout << "[SourceManager] get ebpf_update_conn_addr address failed!" << std::endl;
-        } else {
-          std::cout << "[SourceManager] successfully get ebpf_update_conn_addr address" << std::endl;
-        }
-        err = dladdr(ebpf_update_conn_addr_ptr, &dlinfo);
-        if (!err)
-        {
-          printf("[SourceManager] ebpf_update_conn_addr laddr failed, err:%s\n", strerror(err));
-        } else {
-          config->upca_offset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
-          std::cout << "[SourceManager] successfully get ebpf_update_conn_addr dlinfo, upca_offset" << config->upca_offset << std::endl;
-        }
-
-        void* ebpf_disable_process_ptr = dlsym(handle, "ebpf_disable_process");
-        if (nullptr == ebpf_disable_process_ptr) {
-          std::cout << "[SourceManager] get ebpf_disable_process address failed!" << std::endl;
-        } else {
-          std::cout << "[SourceManager] successfully get ebpf_disable_process address" << std::endl;
-        }
-        err = dladdr(ebpf_disable_process_ptr, &dlinfo);
-        if (!err)
-        {
-          printf("[SourceManager] ebpf_disable_process laddr failed, err:%s\n", strerror(err));
-        } else {
-          config->upps_offset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
-          std::cout << "[SourceManager] successfully get ebpf_disable_process dlinfo, upps_offset:" << config->upps_offset << std::endl;
-        }
-
-        void* ebpf_update_conn_role_ptr = dlsym(handle, "ebpf_update_conn_role");
-        if (nullptr == ebpf_update_conn_role_ptr) {
-          std::cout << "[SourceManager] get ebpf_update_conn_role address failed!" << std::endl;
-        } else {
-          std::cout << "[SourceManager] successfully get ebpf_update_conn_role address" << std::endl;
-        }
-        err = dladdr(ebpf_update_conn_role_ptr, &dlinfo);
-        if (!err)
-        {
-          printf("[SourceManager] ebpf_update_conn_role laddr failed, err:%s\n", strerror(err));
-        } else {
-          config->upcr_offset = (long)dlinfo.dli_saddr - (long)dlinfo.dli_fbase;
-          std::cout << "[SourceManager] successfully get ebpf_update_conn_role dlinfo, upcr_offset:" << config->upcr_offset << std::endl;
-        }
-        init_param = (void*)config;
-      } else if (std::string::npos != libPath.find("_secure.so")) {
-        init_param = rawConfig;
-      }
-
-      initPluginFunc(init_param);
-      return true;
-    }
-
-    void runCore() {
-
-        std::cout << "begin to run core" << std::endl;
-        while (true) {
-            std::cout << "before call" << std::endl;
-            std::cout << "after call" << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(10));
-      }
-    }
-    void clearPlugin() {
-        if (handle) {
-            if (deinitPluginFunc)
-                deinitPluginFunc();
-            dlclose(handle);
-        }
-    }
 private:
-    void *handle;
-    init_func initPluginFunc;
-    call_func callFunc;
-    deinit_func deinitPluginFunc;
+    SourceManager();
+    ~SourceManager();
+    enum socket_trace_func {
+        INIT = 0,
+        UPDATE = 1,
+        DEINIT = 2,
+        CLEAN_UP_DOG = 3,
+        UPDATE_CONN_ADDR = 4,
+        DISABLE_PROCESS = 5,
+        UPDATE_CONN_ROLE = 6,
+        MAX = 7,
+    };
+    enum process_probe_func {
+        INIT = 0,
+        UPDATE = 1,
+        DEINIT = 2,
+        MAX = 3,
+    };
+    std::vector<std::shared_ptr<DynamicLibLoader>> m_libs_;
+    std::map<int, std::vector<void*>> lib_funcs_;
+    std::vector<std::atomic_bool> running_;
 };
 
 }
