@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "ebpf/observer/ObserverServer.h"
+#include "common/RuntimeUtil.h"
 #include "ebpf/SourceManager.h"
 
 #include <thread>
@@ -96,12 +97,13 @@ void ObserverServer::RemoveObserverOptions(const std::string& name, size_t index
 }
 
 void ObserverServer::Init() {
-    std::call_once(once_, std::bind(&ObserverServer::InitBPF, this));
+    // std::call_once(once_, std::bind(&ObserverServer::InitBPF, this));
 }
 
 void ObserverServer::InitBPF() {
-    sm_ = logtail::ebpf::source_manager();
-    sm_.initPlugin("/usr/local/ilogtail/libsockettrace.so", nullptr);
+    // memory is managed by ebpf plugin ... 
+    SockettraceConfig* config = new SockettraceConfig;
+    ebpf::SourceManager::GetInstance()->LoadAndStartDynamicLib(ebpf::eBPFPluginType::SOCKETTRACE, config);
 }
 
 void ObserverServer::CollectEvents() {

@@ -17,6 +17,13 @@
 #include "queue/ProcessQueueItem.h"
 #include "common/MachineInfoUtil.h"
 #include "common/LogtailCommonFlags.h"
+#include "logger/Logger.h"
+#include "ebpf/include/ProcessApi.h"
+#include "models/LogEvent.h"
+#include "models/PipelineEventGroup.h"
+#include "models/PipelineEvent.h"
+#include "queue/ProcessQueueManager.h"
+#include "queue/ProcessQueueItem.h"
 
 #include <thread>
 #include <mutex>
@@ -26,6 +33,9 @@
 #include <functional>
 
 DEFINE_FLAG_BOOL(secure_cb_use_class_method, "whether use class method as callback or not, default is true", true);
+DEFINE_FLAG_BOOL(secure_enable_libbpf_debug, "whether enable libbpf debug for processsecure or not, default is true", false);
+DEFINE_FLAG_BOOL(secure_enable_ebpf_feature, "whether enable secure ebpf feature or not, default is false", false);
+
 
 namespace logtail {
 
@@ -38,20 +48,16 @@ void SecurityServer::Start(BPFSecurityPipelineType type) {
         return;
     } else {
         // TODO: 创建一个线程，用于接收ebpf返回的数据，并将数据推送到对应的队列中
-        Init();
-        mIsRunning = true;
         LOG_INFO(sLogger, ("security ebpf server", "started"));
     }
 }
 
 void SecurityServer::Stop(BPFSecurityPipelineType type) {
     // TODO: ebpf_stop(); 停止所有类型的ebpf探针
-    mIsRunning = false;
 }
 
 void SecurityServer::Stop() {
-    // TODO: ebpf_stop(); 停止所有类型的ebpf探针
-    mIsRunning = false;
+    logtail::ebpf::SourceManager::GetInstance()->StopProcessProbe();
 }
 
 // 插件配置注册逻辑
@@ -67,16 +73,19 @@ void SecurityServer::AddSecurityOptions(const std::string& name,
         case SecurityFilterType::FILE: {
             // TODO: ebpf_start(type);
             fileConfig_ = std::make_pair(options, ctx);
+            InitBPF(BPFSecurityPipelineType::PIPELINE_FILE);
             break;
         }
         case SecurityFilterType::PROCESS: {
             // TODO: ebpf_start(type);
             processConfig_ = std::make_pair(options, ctx);
+            InitBPF(BPFSecurityPipelineType::PIPELINE_PROCESS);
             break;
         }
         case SecurityFilterType::NETWORK: {
             // TODO: ebpf_start(type);
             networkConfig_ = std::make_pair(options, ctx);
+            InitBPF(BPFSecurityPipelineType::PIPELINE_NETWORK);
             break;
         }
         default:
@@ -91,16 +100,19 @@ void SecurityServer::RemoveSecurityOptions(const std::string& name, size_t index
     switch (mInputConfigMap[key].first->mFilterType) {
         case SecurityFilterType::FILE: {
             // TODO: ebpf_stop(type);
+            StopBPF(BPFSecurityPipelineType::PIPELINE_FILE);
             fileConfig_ = std::make_pair(nullptr, nullptr);
             break;
         }
         case SecurityFilterType::PROCESS: {
             // TODO: ebpf_stop(type);
+            StopBPF(BPFSecurityPipelineType::PIPELINE_PROCESS);
             processConfig_ = std::make_pair(nullptr, nullptr);
             break;
         }
         case SecurityFilterType::NETWORK: {
             // TODO: ebpf_stop(type);
+            StopBPF(BPFSecurityPipelineType::PIPELINE_NETWORK);
             networkConfig_ = std::make_pair(nullptr, nullptr);
             break;
         }
@@ -110,25 +122,57 @@ void SecurityServer::RemoveSecurityOptions(const std::string& name, size_t index
     mInputConfigMap.erase(key);
 }
 
-void SecurityServer::Init() {
-    std::call_once(once_, std::bind(&SecurityServer::InitBPF, this));
-}
+void SecurityServer::Init() {}
 
 void HandleSecureEvent(std::unique_ptr<AbstractSecurityEvent> event) {
-    std::cout << "[SecurityServer] [HandleSecureEvent] Enter ~" << std::endl;
+    LOG_DEBUG(sLogger, ("HandleSecureEvent", "enter"));
     SecurityServer::GetInstance()->HandleProcessSecureEvent(std::move(event));
-    std::cout << "[SecurityServer] [HandleSecureEvent] Exit ~" << std::endl;
+    LOG_DEBUG(sLogger, ("HandleSecureEvent", "exit"));
     return;
 }
 
-void SecurityServer::HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEvent> event) {
-    std::cout << "[SecurityServer] [HandleProcessSecureEvent] Enter ~" << std::endl;
-    if (event == nullptr) {return;}
+void HandleBatchSecureEvent(std::vector<std::unique_ptr<AbstractSecurityEvent>> events) {
+    LOG_DEBUG(sLogger, ("HandleBatchSecureEvent", "enter"));
+    SecurityServer::GetInstance()->HandleBatchProcessSecureEvents(std::move(events));
+    LOG_DEBUG(sLogger, ("HandleBatchSecureEvent", "exit"));
+}
 
+void SecurityServer::HandleBatchProcessSecureEvents(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events) {
+    LOG_DEBUG(sLogger, ("HandleSecureEvent enter, events size", events.size()));
+    if (events.empty()) {
+        return;
+    }
+    auto ctx = this->processConfig_.second;
+}
+
+void SecurityServer::HandleBatchProcessSecureEvents(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events) {
+    HandleBatchEventsInternel(this->processConfig_.second, std::move(events));
+}
+void SecurityServer::HandleBatchNetworSecureEvents(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events) {
+    HandleBatchEventsInternel(this->networkConfig_.second, std::move(events));
+}
+
+void SecurityServer::HandleBatchEventsInternel(const PipelineContext* ctx, std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events) {
+    // if (ctx == nullptr || events.empty()) {
+    //     return ;
+    // }
+    // std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
+    // PipelineEventGroup mTestEventGroup(mSourceBuffer);
+    // // aggregate to pipeline event group
+    // // mTestEventGroup.SetTag();
+    // for (auto& x : events) {
+    //     auto event = mTestEventGroup.AddLogEvent();
+    //     // event->SetContent
+    // }
+}
+
+void SecurityServer::HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEvent>&& event) {
+    LOG_DEBUG(sLogger, ("HandleSecureEvent", "enter"));
+    if (event == nullptr) {return;}
     // TODO @qianlu.kk merge multi events into a group
     auto ctx = this->processConfig_.second;
     if (ctx == nullptr) {
-        std::cout << "[SecurityServer] [HandleProcessSecureEvent] ctx is null!" << std::endl;
+        LOG_ERROR(sLogger, ("HandleSecureEvent ctx", "null"));
         return;
     }
     auto source_buffer = std::make_shared<SourceBuffer>();
@@ -142,96 +186,115 @@ void SecurityServer::HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEv
     std::unique_ptr<ProcessQueueItem> item = 
             std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(group), 0));
     ProcessQueueManager::GetInstance()->PushQueue(ctx->GetProcessQueueKey(), std::move(item));
-    std::cout << "[SecurityServer] [PushQueue] Done ~" << std::endl;
+    LOG_DEBUG(sLogger, ("Push queue", "done"));
     return;
 }
 
-void SecurityServer::InitBPF() {
-    sm_ = logtail::ebpf::source_manager();
-    config_ = std::make_shared<SecureConfig>();
+void SecurityServer::InitBPF(BPFSecurityPipelineType type) {
+    IncreaseRef();
+    // init configs
+    SecureConfig* config_ = new SecureConfig;
+    config_->type = UpdataType::ENABLE_PROBE;
     config_->host_path_prefix_ = STRING_FLAG(default_container_host_path);
-    std::cout << "[SecurityServer] host_path_prefix from flag is:" << config_->host_path_prefix_ << std::endl;
-    // config_->host_path_prefix_ = "/logtail_host";
-    // get host name
+    /// get host name
     config_->host_name_ = GetHostName();
-    // get host ip
+    /// get host ip
     config_->host_ip_ = GetHostIp();
-    config_->enable_libbpf_debug_ = true;
-    // set callback
-    if (FLAGS_secure_cb_use_class_method) {
-        std::cout << "[SecurityServer] use class method as callback ... "<< std::endl;
-        config_->cb_ = std::bind(&SecurityServer::HandleProcessSecureEvent, this, std::placeholders::_1);
+    config_->enable_libbpf_debug_ = BOOL_FLAG(secure_enable_libbpf_debug);
+    /// set callbacks
+    if (type == BPFSecurityPipelineType::PIPELINE_NETWORK) {
+        if (FLAGS_secure_cb_use_class_method) {
+            config_->net_batch_cb_ = std::bind(&SecurityServer::HandleBatchNetworSecureEvents, this, std::placeholders::_1);
+            config_->net_single_cb_ = nullptr;
+        } else {
+            config_->net_batch_cb_ = nullptr;
+            config_->net_single_cb_ = nullptr;
+        }
+        config_->enable_probes_[(int)SecureEventType::TYPE_SOCKET_SECURE];
+        auto& options = networkConfig_.first;
+        for (auto& item : options->mOptionList) {
+            std::vector<std::string> names = item.mCallName;
+            config_->network_call_names_ = names;
+            auto& filter = std::get<SecurityNetworkFilter>(item.mFilter);
+            config_->enable_dips_ = filter.mDestAddrList;
+            config_->disable_dips_ = filter.mDestAddrBlackList;
+            config_->enable_sips_ = filter.mSourceAddrList;
+            config_->disable_sips_ = filter.mSourceAddrBlackList;
+            config_->enable_dports_ = filter.mDestPortList;
+            config_->disable_dports_ = filter.mDestPortBlackList;
+            config_->enable_sports_ = filter.mSourcePortList;
+            config_->disable_sports_ = filter.mSourcePortBlackList;
+        }
+
+    } else if (type == BPFSecurityPipelineType::PIPELINE_PROCESS) {
+        if (FLAGS_secure_cb_use_class_method) {
+            config_->proc_single_cb_ = std::bind(&SecurityServer::HandleProcessSecureEvent, this, std::placeholders::_1);
+            config_->proc_batch_cb_ = std::bind(&SecurityServer::HandleBatchProcessSecureEvents, this, std::placeholders::_1);
+        } else {
+            config_->proc_single_cb_ = HandleSecureEvent;
+            config_->proc_batch_cb_ = HandleBatchSecureEvent;
+        }
+        config_->enable_probes_[(int)SecureEventType::TYPE_PROCESS_SECURE];
+        auto& options = processConfig_.first;
+        for (auto& item : options->mOptionList) {
+            std::vector<std::string> names = item.mCallName;
+            config_->network_call_names_ = names;
+            auto& filter = std::get<SecurityProcessFilter>(item.mFilter);
+            config_->enable_namespaces_ = std::vector<NamespaceFilter>(filter.mNamespaceFilter.size());
+            std::transform(filter.mNamespaceFilter.begin(), filter.mNamespaceFilter.end(), config_->enable_namespaces_.begin(),
+                   [](SecurityProcessNamespaceFilter val) -> NamespaceFilter {
+                       NamespaceFilter tmp;
+                       tmp.mValueList = val.mValueList;
+                       tmp.mNamespaceType = val.mNamespaceType;
+                       return tmp;
+                   });
+            config_->disable_namespaces_ = std::vector<NamespaceFilter>(filter.mNamespaceBlackFilter.size());
+            std::transform(filter.mNamespaceBlackFilter.begin(), filter.mNamespaceBlackFilter.end(), config_->disable_namespaces_.begin(),
+                   [](SecurityProcessNamespaceFilter val) -> NamespaceFilter {
+                       NamespaceFilter tmp;
+                       tmp.mValueList = val.mValueList;
+                       tmp.mNamespaceType = val.mNamespaceType;
+                       return tmp;
+                   });
+        }
     } else {
-        std::cout << "[SecurityServer] not use class method as callback ... "<< std::endl;
-        config_->cb_ = HandleSecureEvent;
+        config_->enable_probes_[(int)SecureEventType::MAX];
     }
     
-    sm_.initPlugin("/usr/local/ilogtail/libsockettrace_secure.so", config_.get());
-    this->flag_ = true;
-
-    // get host prefix
-    // config->host_path_prefix_ = STRING_FLAG(default_container_host_path);
-
-    // TODO deliver config to 
-    // core_thread_ = std::thread(&SecurityServer::CollectEvents, this);
+    // ensure dl running
+    bool res = logtail::ebpf::SourceManager::GetInstance()->LoadAndStartDynamicLib(ebpf::eBPFPluginType::PROCESS, (void*)config_);
+    LOG_INFO(sLogger, 
+        ("host_path_prefix_", "config_->host_path_prefix_")("host_name_", config_->host_name_)("host_ip_", config_->host_ip_)("load res", res));
+    if (!res) return;
+    // config may changed, force update it ...
+    logtail::ebpf::SourceManager::GetInstance()->UpdateConfig(ebpf::eBPFPluginType::PROCESS, (void*)config_);
 }
 
-void SecurityServer::StopBPF() {
-    sm_.clearPlugin();
-    this->flag_ = false;
-    // if (core_thread_.joinable()) {
-    //     core_thread_.join();
-    // }
-}
-
-void SecurityServer::CollectEvents() {
-    // std::unique_ptr<ProcessQueueItem> item
-    //     = std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(group), inputIndex));
-    // for (size_t i = 0; i < retryTimes; ++i) {
-    //     if (ProcessQueueManager::GetInstance()->PushQueue(key, std::move(item)) == 0) {
-    //         return true;
-    //     }
-    //     if (i % 100 == 0) {
-    //         LOG_WARNING(sLogger,
-    //                     ("push attempts to process queue continuously failed for the past second",
-    //                      "retry again")("config", QueueKeyManager::GetInstance()->GetName(key))("input index",
-    //                                                                                             ToString(inputIndex)));
-    //     }
-    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    // }
-    while (flag_) {
-        if (this->processConfig_.second == nullptr) continue;
-
-        auto ctx = this->processConfig_.second;
-        auto source_buffer = std::make_shared<SourceBuffer>();
-        PipelineEventGroup group(source_buffer);
-
-        // for (int i = 0; i < 10; i ++ ) {
-        //     auto event = group.AddLogEvent();
-        //     event->SetContentNoCopy("qianlu", "test");
-        //     event->SetContentNoCopy("key1", "value1");
-        //     event->SetContentNoCopy("key2", "value2");
-        //     event->SetContentNoCopy("key3", "value3");
-
-        //     auto spanEvent = group.AddSpanEvent();
-        // }
-        std::unique_ptr<ProcessQueueItem> item = 
-                std::unique_ptr<ProcessQueueItem>(new ProcessQueueItem(std::move(group), 0));
-        ProcessQueueManager::GetInstance()->PushQueue(ctx->GetProcessQueueKey(), std::move(item));
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+void SecurityServer::StopBPF(BPFSecurityPipelineType type) {
+    DecreaseRef();
+    if (ref_.load() <= 0) {
+        logtail::ebpf::SourceManager::GetInstance()->StopProcessProbe();
+        return;
     }
+    auto config = new SecureConfig;
+    config->type = UpdataType::DISABLE_PROBE;
+    // update config
+    if (type == BPFSecurityPipelineType::PIPELINE_FILE) {
+    } else if (type == BPFSecurityPipelineType::PIPELINE_PROCESS) {
+        config->disable_probes_[(int)SecureEventType::TYPE_PROCESS_SECURE];
+        ebpf::SourceManager::GetInstance()->UpdateConfig(ebpf::eBPFPluginType::PROCESS, (void*)config);
+    } else if (type == BPFSecurityPipelineType::PIPELINE_NETWORK) {
+        config->disable_probes_[(int)SecureEventType::TYPE_SOCKET_SECURE];
+        ebpf::SourceManager::GetInstance()->UpdateConfig(ebpf::eBPFPluginType::PROCESS, (void*)config);
+    }
+}
 
-    // get ops and config
-    // auto securityConfigMap = this->mInputConfigMap[0];
-    // auto m_ctx = securityConfigMap.second;
-    // auto key = m_ctx->GetProcessQueueKey();
-    // auto item = std::make_unique<ProcessQueueItem>();
-    // for (int i = 0 ; i < 1000; i ++ ) {
-    //     auto event = item->mEventGroup.AddLogEvent();
+void SecurityServer::IncreaseRef() {
+    ref_.fetch_add(1);
+}
 
-    //     event->SetContent("aa", "aa");
-    // }
-    // ProcessQueueManager::GetInstance()->PushQueue(key, std::move(item));
+void SecurityServer::DecreaseRef() {
+    ref_.fetch_add(-1);
 }
 
 } // namespace logtail
