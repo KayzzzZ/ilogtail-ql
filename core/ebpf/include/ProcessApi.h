@@ -21,22 +21,10 @@
 
 
 enum class SecureEventType {
-  TYPE_SOCKET_SECURE,
-  TYPE_FILE_SECURE,
-  TYPE_PROCESS_SECURE,
+  SECURE_EVENT_TYPE_SOCKET_SECURE,
+  SECURE_EVENT_TYPE_FILE_SECURE,
+  SECURE_EVENT_TYPE_PROCESS_SECURE,
   MAX,
-};
-
-class BatchAbstractSecurityEvent {
-public:
-  BatchAbstractSecurityEvent(){}
-  std::vector<std::pair<std::string, std::string>> GetAllTags() { return tags_; }
-  uint64_t GetTimestamp() { return timestamp_; }
-  std::vector<std::pair<std::string, std::string>> GetAllTags() { return tags_; }
-private:
-  std::vector<std::pair<std::string, std::string>> tags_;
-  uint64_t timestamp_;
-  std::vector<std::unique_ptr<AbstractSecurityEvent>> events;
 };
 
 class AbstractSecurityEvent {
@@ -53,6 +41,17 @@ private:
   uint64_t timestamp_;
 };
 
+class BatchAbstractSecurityEvent {
+public:
+  BatchAbstractSecurityEvent(){}
+  std::vector<std::pair<std::string, std::string>> GetAllTags() { return tags_; }
+  uint64_t GetTimestamp() { return timestamp_; }
+private:
+  std::vector<std::pair<std::string, std::string>> tags_;
+  uint64_t timestamp_;
+  std::vector<std::unique_ptr<AbstractSecurityEvent>> events;
+};
+
 //class ProcessSecurityEvent : public AbstractSecurityEvent {
 //public:
 //  ProcessSecurityEvent() {}
@@ -66,19 +65,27 @@ using HandleBatchDataEventFn = std::function<void(std::vector<std::unique_ptr<Ab
 //typedef void (*HandleDataEventFn)(void* ctx, std::unique_ptr<AbstractSecurityEvent> event);
 
 enum UpdataType {
-  ENABLE_PROBE = 0,
-  CONFIG_CHAGE = 1,
-  DISABLE_PROBE = 2,
+  SECURE_UPDATE_TYPE_ENABLE_PROBE = 0,
+  SECURE_UPDATE_TYPE_CONFIG_CHAGE = 1,
+  SECURE_UPDATE_TYPE_DISABLE_PROBE = 2,
   MAX = 3,
+};
+
+#define STRING_DEFAULT ""
+// process
+struct NamespaceFilter {
+    // type of securityNamespaceFilter
+    std::string mNamespaceType = STRING_DEFAULT;
+    std::vector<std::string> mValueList;
 };
 
 // Config
 struct SecureConfig {
 public:
   bool enable_libbpf_debug_ = false;
-  UpdataType type = UpdataType::ENABLE_PROBE;
-  bool enable_probes_[static_cast<int>(SecureEventType::MAX)];
-  bool disable_probes_[static_cast<int>(SecureEventType::MAX)];
+  UpdataType type = UpdataType::SECURE_UPDATE_TYPE_ENABLE_PROBE;
+  bool SECURE_UPDATE_TYPE_ENABLE_PROBEs_[static_cast<int>(SecureEventType::MAX)];
+  bool SECURE_UPDATE_TYPE_DISABLE_PROBEs_[static_cast<int>(SecureEventType::MAX)];
   // common config
   std::string host_name_;
   std::string host_ip_;
@@ -87,6 +94,8 @@ public:
   std::vector<std::string> process_call_names_;
   std::vector<std::string> file_call_names_;
   
+  std::vector<NamespaceFilter> enable_namespaces_;
+  std::vector<NamespaceFilter> disable_namespaces_;
   // process dynamic config
   std::vector<std::string> enable_pid_ns_;
   std::vector<std::string> disable_pid_ns_;

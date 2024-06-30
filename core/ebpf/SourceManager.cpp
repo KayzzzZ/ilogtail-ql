@@ -54,7 +54,7 @@ namespace ebpf {
     
 SourceManager::SourceManager() : 
         m_libs_(std::vector<std::shared_ptr<DynamicLibLoader>>(static_cast<int>(eBPFPluginType::MAX), nullptr)),
-        running_(std::vector<std::atomic_bool>(static_cast<int>(eBPFPluginType::MAX), false)) {
+        running_(std::vector<std::atomic_bool>(static_cast<int>(eBPFPluginType::MAX))) {
 }
 
 SourceManager::~SourceManager() {
@@ -110,7 +110,8 @@ bool SourceManager::LoadAndStartDynamicLib(eBPFPluginType type, void* config) {
 bool SourceManager::StartSockettraceProbe(SockettraceConfig* config) {
   if (!DynamicLibLoadSucess(eBPFPluginType::SOCKETTRACE)) {
     // no init yet ... 
-    return true;
+    LOG_ERROR(sLogger, ("libsockettrace load failed", ""));
+    return false;
   }
   if (running_[static_cast<int>(eBPFPluginType::SOCKETTRACE)]) return true;
   auto it = lib_funcs_.find(static_cast<int>(eBPFPluginType::SOCKETTRACE));
@@ -125,16 +126,16 @@ bool SourceManager::StartSockettraceProbe(SockettraceConfig* config) {
   // this memory will be managed by plugin
   auto tmp_lib = m_libs_[static_cast<int>(eBPFPluginType::SOCKETTRACE)];
   auto binary_path_ = GetProcessExecutionDir();
-  config->so = std::filesystem::path(binary_path_) / "libsockettrace.so";
-  config->so_size = config->so.length();
+  config->so_ = std::filesystem::path(binary_path_) / "libsockettrace.so";
+  config->so_size_ = config->so_.length();
 
-  config->uprobe_offset = LOAD_UPROBE_OFFSET(t_funcs[socket_trace_func::CLEAN_UP_DOG]);
-  config->upcr_offset = LOAD_UPROBE_OFFSET(t_funcs[socket_trace_func::UPDATE_CONN_ROLE]);
-  config->upps_offset = LOAD_UPROBE_OFFSET(t_funcs[socket_trace_func::DISABLE_PROCESS]);
-  config->upca_offset = LOAD_UPROBE_OFFSET(t_funcs[socket_trace_func::UPDATE_CONN_ADDR]);
+  config->uprobe_offset_ = LOAD_UPROBE_OFFSET(t_funcs[socket_trace_func::SOCKET_TRACE_CLEAN_UP_DOG]);
+  config->upcr_offset_ = LOAD_UPROBE_OFFSET(t_funcs[socket_trace_func::SOCKET_TRACE_UPDATE_CONN_ROLE]);
+  config->upps_offset_ = LOAD_UPROBE_OFFSET(t_funcs[socket_trace_func::SOCKET_TRACE_DISABLE_PROCESS]);
+  config->upca_offset_ = LOAD_UPROBE_OFFSET(t_funcs[socket_trace_func::SOCKET_TRACE_UPDATE_CONN_ADDR]);
 
   auto& funcs = it->second;
-  auto init = (init_func)funcs[socket_trace_func::INIT];
+  auto init = (init_func)funcs[socket_trace_func::SOCKET_TRACE_INIT];
   if (!init) return false;
   init((void*)config);
   return true;
@@ -153,7 +154,7 @@ bool SourceManager::StopSockettraceProbe() {
     return false;
   }
   auto& funcs = it->second;
-  auto deinit = (deinit_func)funcs[socket_trace_func::DEINIT];
+  auto deinit = (deinit_func)funcs[socket_trace_func::SOCKET_TRACE_DEINIT];
   if (!deinit) return false;
   deinit();
   return true;
@@ -163,7 +164,8 @@ bool SourceManager::StartProcessProbe(SecureConfig* config) {
   // call deinit
   if (!DynamicLibLoadSucess(eBPFPluginType::PROCESS)) {
     // no init yet ... 
-    return true;
+    LOG_ERROR(sLogger, ("libsockettracesecure load failed", ""));
+    return false;
   }
   if (running_[static_cast<int>(eBPFPluginType::PROCESS)]) return true;
   auto it = lib_funcs_.find(static_cast<int>(eBPFPluginType::PROCESS));
@@ -172,7 +174,7 @@ bool SourceManager::StartProcessProbe(SecureConfig* config) {
     return false;
   }
   auto& funcs = it->second;
-  auto init = (init_func)funcs[process_probe_func::INIT];
+  auto init = (init_func)funcs[process_probe_func::PROCESS_INIT];
   init((void*)config);
   return true;
 }
@@ -190,7 +192,7 @@ bool SourceManager::StopProcessProbe() {
     return false;
   }
   auto& funcs = it->second;
-  auto deinit = (deinit_func)funcs[process_probe_func::DEINIT];
+  auto deinit = (deinit_func)funcs[process_probe_func::PROCESS_DEINIT];
   if (!deinit) return false;
   deinit();
   return true;
@@ -207,19 +209,18 @@ bool SourceManager::LoadSockettraceProbe() {
       return false;
   }
   // init funcs
-  std::vector<void*> t_funcs(socket_trace_func::MAX, nullptr);
+  std::vector<void*> t_funcs(socket_trace_func::SOCKET_TRACE_MAX, nullptr);
   // set offset configs
   // init config
   // this memory will be managed by plugin
-  auto tmp_lib = m_libs_[static_cast<int>(eBPFPluginType::SOCKETTRACE)];
 
-  t_funcs[socket_trace_func::INIT] = LOAD_EBPF_FUNC_ADDR("init");
-  t_funcs[socket_trace_func::UPDATE] = LOAD_EBPF_FUNC_ADDR("update");
-  t_funcs[socket_trace_func::DEINIT] = LOAD_EBPF_FUNC_ADDR("deinit");
-  t_funcs[socket_trace_func::CLEAN_UP_DOG] = LOAD_EBPF_FUNC_ADDR("ebpf_cleanup_dog");
-  t_funcs[socket_trace_func::UPDATE_CONN_ROLE] = LOAD_EBPF_FUNC_ADDR("ebpf_update_conn_role");
-  t_funcs[socket_trace_func::DISABLE_PROCESS] = LOAD_EBPF_FUNC_ADDR("ebpf_disable_process");
-  t_funcs[socket_trace_func::UPDATE_CONN_ADDR] = LOAD_EBPF_FUNC_ADDR("ebpf_update_conn_addr");
+  t_funcs[socket_trace_func::SOCKET_TRACE_INIT] = LOAD_EBPF_FUNC_ADDR(init);
+  t_funcs[socket_trace_func::SOCKET_TRACE_UPDATE] = LOAD_EBPF_FUNC_ADDR(update);
+  t_funcs[socket_trace_func::SOCKET_TRACE_DEINIT] = LOAD_EBPF_FUNC_ADDR(deinit);
+  t_funcs[socket_trace_func::SOCKET_TRACE_CLEAN_UP_DOG] = LOAD_EBPF_FUNC_ADDR(ebpf_cleanup_dog);
+  t_funcs[socket_trace_func::SOCKET_TRACE_UPDATE_CONN_ROLE] = LOAD_EBPF_FUNC_ADDR(ebpf_update_conn_role);
+  t_funcs[socket_trace_func::SOCKET_TRACE_DISABLE_PROCESS] = LOAD_EBPF_FUNC_ADDR(ebpf_disable_process);
+  t_funcs[socket_trace_func::SOCKET_TRACE_UPDATE_CONN_ADDR] = LOAD_EBPF_FUNC_ADDR(ebpf_update_conn_addr);
 
   // check function load success
   for (auto& x : t_funcs) {
@@ -243,10 +244,10 @@ bool SourceManager::LoadProcessProbe() {
   }
 
   // init funcs
-  std::vector<void*> t_funcs(process_probe_func::MAX, nullptr);
-  t_funcs[process_probe_func::INIT] = LOAD_EBPF_FUNC_ADDR("init");
-  t_funcs[process_probe_func::UPDATE] = LOAD_EBPF_FUNC_ADDR("update");
-  t_funcs[process_probe_func::DEINIT] = LOAD_EBPF_FUNC_ADDR("deinit");
+  std::vector<void*> t_funcs(process_probe_func::PROCESS_MAX, nullptr);
+  t_funcs[process_probe_func::PROCESS_INIT] = LOAD_EBPF_FUNC_ADDR(init);
+  t_funcs[process_probe_func::PROCESS_UPDATE] = LOAD_EBPF_FUNC_ADDR(update);
+  t_funcs[process_probe_func::PROCESS_DEINIT] = LOAD_EBPF_FUNC_ADDR(deinit);
 
   // updaate meta
   lib_funcs_.insert({static_cast<int>(eBPFPluginType::PROCESS), std::move(t_funcs)});
@@ -268,7 +269,7 @@ bool SourceManager::UpdateSockettraceProbeConfig(SockettraceConfig* config) {
     return false;
   }
   auto& funcs = it->second;
-  auto update = (update_func)funcs[socket_trace_func::UPDATE];
+  auto update = (update_func)funcs[socket_trace_func::SOCKET_TRACE_UPDATE];
   if (!update) return false;
   update((void*)config);
   return true;
@@ -287,7 +288,7 @@ bool SourceManager::UpdateProcessProbeConfig(SecureConfig* config) {
     return false;
   }
   auto& funcs = it->second;
-  auto update = (update_func)funcs[process_probe_func::UPDATE];
+  auto update = (update_func)funcs[process_probe_func::PROCESS_UPDATE];
   if (!update) return false;
   update((void*)config);
   return true;

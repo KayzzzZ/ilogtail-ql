@@ -68,20 +68,20 @@ private:
     SourceManager();
     ~SourceManager();
     enum socket_trace_func {
-        INIT = 0,
-        UPDATE = 1,
-        DEINIT = 2,
-        CLEAN_UP_DOG = 3,
-        UPDATE_CONN_ADDR = 4,
-        DISABLE_PROCESS = 5,
-        UPDATE_CONN_ROLE = 6,
-        MAX = 7,
+        SOCKET_TRACE_INIT = 0,
+        SOCKET_TRACE_UPDATE = 1,
+        SOCKET_TRACE_DEINIT = 2,
+        SOCKET_TRACE_CLEAN_UP_DOG = 3,
+        SOCKET_TRACE_UPDATE_CONN_ADDR = 4,
+        SOCKET_TRACE_DISABLE_PROCESS = 5,
+        SOCKET_TRACE_UPDATE_CONN_ROLE = 6,
+        SOCKET_TRACE_MAX = 7,
     };
     enum process_probe_func {
-        INIT = 0,
-        UPDATE = 1,
-        DEINIT = 2,
-        MAX = 3,
+        PROCESS_INIT = 0,
+        PROCESS_UPDATE = 1,
+        PROCESS_DEINIT = 2,
+        PROCESS_MAX = 3,
     };
     std::vector<std::shared_ptr<DynamicLibLoader>> m_libs_;
     std::map<int, std::vector<void*>> lib_funcs_;

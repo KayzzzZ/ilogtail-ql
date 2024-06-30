@@ -85,9 +85,9 @@ private:
     volatile int flag_;
     std::atomic_int ref_;
 
-    SecurityConfig networkConfig_;
-    SecurityConfig processConfig_;
-    SecurityConfig fileConfig_;
+    SecurityConfig network_config_;
+    SecurityConfig process_config_;
+    SecurityConfig file_config_;
 };
 
 } // namespace logtail

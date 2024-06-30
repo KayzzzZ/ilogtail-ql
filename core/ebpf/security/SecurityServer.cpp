@@ -72,19 +72,19 @@ void SecurityServer::AddSecurityOptions(const std::string& name,
     switch (options->mFilterType) {
         case SecurityFilterType::FILE: {
             // TODO: ebpf_start(type);
-            fileConfig_ = std::make_pair(options, ctx);
+            file_config_ = std::make_pair(options, ctx);
             InitBPF(BPFSecurityPipelineType::PIPELINE_FILE);
             break;
         }
         case SecurityFilterType::PROCESS: {
             // TODO: ebpf_start(type);
-            processConfig_ = std::make_pair(options, ctx);
+            process_config_ = std::make_pair(options, ctx);
             InitBPF(BPFSecurityPipelineType::PIPELINE_PROCESS);
             break;
         }
         case SecurityFilterType::NETWORK: {
             // TODO: ebpf_start(type);
-            networkConfig_ = std::make_pair(options, ctx);
+            network_config_ = std::make_pair(options, ctx);
             InitBPF(BPFSecurityPipelineType::PIPELINE_NETWORK);
             break;
         }
@@ -101,19 +101,19 @@ void SecurityServer::RemoveSecurityOptions(const std::string& name, size_t index
         case SecurityFilterType::FILE: {
             // TODO: ebpf_stop(type);
             StopBPF(BPFSecurityPipelineType::PIPELINE_FILE);
-            fileConfig_ = std::make_pair(nullptr, nullptr);
+            file_config_ = std::make_pair(nullptr, nullptr);
             break;
         }
         case SecurityFilterType::PROCESS: {
             // TODO: ebpf_stop(type);
             StopBPF(BPFSecurityPipelineType::PIPELINE_PROCESS);
-            processConfig_ = std::make_pair(nullptr, nullptr);
+            process_config_ = std::make_pair(nullptr, nullptr);
             break;
         }
         case SecurityFilterType::NETWORK: {
             // TODO: ebpf_stop(type);
             StopBPF(BPFSecurityPipelineType::PIPELINE_NETWORK);
-            networkConfig_ = std::make_pair(nullptr, nullptr);
+            network_config_ = std::make_pair(nullptr, nullptr);
             break;
         }
         default:
@@ -138,18 +138,10 @@ void HandleBatchSecureEvent(std::vector<std::unique_ptr<AbstractSecurityEvent>> 
 }
 
 void SecurityServer::HandleBatchProcessSecureEvents(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events) {
-    LOG_DEBUG(sLogger, ("HandleSecureEvent enter, events size", events.size()));
-    if (events.empty()) {
-        return;
-    }
-    auto ctx = this->processConfig_.second;
-}
-
-void SecurityServer::HandleBatchProcessSecureEvents(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events) {
-    HandleBatchEventsInternel(this->processConfig_.second, std::move(events));
+    HandleBatchEventsInternel(this->process_config_.second, std::move(events));
 }
 void SecurityServer::HandleBatchNetworSecureEvents(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events) {
-    HandleBatchEventsInternel(this->networkConfig_.second, std::move(events));
+    HandleBatchEventsInternel(this->network_config_.second, std::move(events));
 }
 
 void SecurityServer::HandleBatchEventsInternel(const PipelineContext* ctx, std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events) {
@@ -170,7 +162,7 @@ void SecurityServer::HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEv
     LOG_DEBUG(sLogger, ("HandleSecureEvent", "enter"));
     if (event == nullptr) {return;}
     // TODO @qianlu.kk merge multi events into a group
-    auto ctx = this->processConfig_.second;
+    auto ctx = this->process_config_.second;
     if (ctx == nullptr) {
         LOG_ERROR(sLogger, ("HandleSecureEvent ctx", "null"));
         return;
@@ -194,7 +186,7 @@ void SecurityServer::InitBPF(BPFSecurityPipelineType type) {
     IncreaseRef();
     // init configs
     SecureConfig* config_ = new SecureConfig;
-    config_->type = UpdataType::ENABLE_PROBE;
+    config_->type = UpdataType::SECURE_UPDATE_TYPE_ENABLE_PROBE;
     config_->host_path_prefix_ = STRING_FLAG(default_container_host_path);
     /// get host name
     config_->host_name_ = GetHostName();
@@ -210,8 +202,8 @@ void SecurityServer::InitBPF(BPFSecurityPipelineType type) {
             config_->net_batch_cb_ = nullptr;
             config_->net_single_cb_ = nullptr;
         }
-        config_->enable_probes_[(int)SecureEventType::TYPE_SOCKET_SECURE];
-        auto& options = networkConfig_.first;
+        config_->SECURE_UPDATE_TYPE_ENABLE_PROBEs_[(int)SecureEventType::SECURE_EVENT_TYPE_SOCKET_SECURE] = true;
+        auto& options = network_config_.first;
         for (auto& item : options->mOptionList) {
             std::vector<std::string> names = item.mCallName;
             config_->network_call_names_ = names;
@@ -234,8 +226,8 @@ void SecurityServer::InitBPF(BPFSecurityPipelineType type) {
             config_->proc_single_cb_ = HandleSecureEvent;
             config_->proc_batch_cb_ = HandleBatchSecureEvent;
         }
-        config_->enable_probes_[(int)SecureEventType::TYPE_PROCESS_SECURE];
-        auto& options = processConfig_.first;
+        config_->SECURE_UPDATE_TYPE_ENABLE_PROBEs_[(int)SecureEventType::SECURE_EVENT_TYPE_PROCESS_SECURE] = true;
+        auto& options = process_config_.first;
         for (auto& item : options->mOptionList) {
             std::vector<std::string> names = item.mCallName;
             config_->network_call_names_ = names;
@@ -258,7 +250,7 @@ void SecurityServer::InitBPF(BPFSecurityPipelineType type) {
                    });
         }
     } else {
-        config_->enable_probes_[(int)SecureEventType::MAX];
+        // config_->SECURE_UPDATE_TYPE_ENABLE_PROBEs_[(int)SecureEventType::MAX];
     }
     
     // ensure dl running
@@ -277,14 +269,14 @@ void SecurityServer::StopBPF(BPFSecurityPipelineType type) {
         return;
     }
     auto config = new SecureConfig;
-    config->type = UpdataType::DISABLE_PROBE;
+    config->type = UpdataType::SECURE_UPDATE_TYPE_DISABLE_PROBE;
     // update config
     if (type == BPFSecurityPipelineType::PIPELINE_FILE) {
     } else if (type == BPFSecurityPipelineType::PIPELINE_PROCESS) {
-        config->disable_probes_[(int)SecureEventType::TYPE_PROCESS_SECURE];
+        config->SECURE_UPDATE_TYPE_DISABLE_PROBEs_[(int)SecureEventType::SECURE_EVENT_TYPE_PROCESS_SECURE] = true;
         ebpf::SourceManager::GetInstance()->UpdateConfig(ebpf::eBPFPluginType::PROCESS, (void*)config);
     } else if (type == BPFSecurityPipelineType::PIPELINE_NETWORK) {
-        config->disable_probes_[(int)SecureEventType::TYPE_SOCKET_SECURE];
+        config->SECURE_UPDATE_TYPE_DISABLE_PROBEs_[(int)SecureEventType::SECURE_EVENT_TYPE_SOCKET_SECURE] = true;
         ebpf::SourceManager::GetInstance()->UpdateConfig(ebpf::eBPFPluginType::PROCESS, (void*)config);
     }
 }
