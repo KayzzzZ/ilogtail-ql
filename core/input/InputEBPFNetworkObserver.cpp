@@ -29,14 +29,22 @@ bool InputEBPFNetworkObserver::Init(const Json::Value& config, uint32_t& pluginI
 
 bool InputEBPFNetworkObserver::Start() {
     ObserverServer::GetInstance()->AddObserverOptions(mContext->GetConfigName(), mIndex, &mObserverOptions, mContext);
+<<<<<<< HEAD
     ObserverServer::GetInstance()->Start(BPFObserverPipelineType::PIPELINE_NETWORK);
+=======
+    ObserverServer::GetInstance()->Start();
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
     return true;
 }
 
 bool InputEBPFNetworkObserver::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
+<<<<<<< HEAD
         ObserverServer::GetInstance()->AddObserverOptions(mContext->GetConfigName(), mIndex, &mObserverOptions, mContext);
         return true;
+=======
+        // TODO: ?
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
     }
     ObserverServer::GetInstance()->RemoveObserverOptions(mContext->GetConfigName(), mIndex);
     return true;

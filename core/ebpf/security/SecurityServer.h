@@ -19,6 +19,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+<<<<<<< HEAD
 #include <mutex>
 #include <thread>
 #include <memory>
@@ -38,6 +39,14 @@ enum class BPFSecurityPipelineType {
     MAX,
 };
 
+=======
+
+#include "ebpf/security/SecurityOptions.h"
+#include "pipeline/PipelineContext.h"
+
+namespace logtail {
+
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
 class SecurityServer {
 public:
     SecurityServer(const SecurityServer&) = delete;
@@ -48,12 +57,17 @@ public:
         return &instance;
     }
 
+<<<<<<< HEAD
     void Start(BPFSecurityPipelineType);
     void Stop(BPFSecurityPipelineType);
     void Stop();
     void IncreaseRef();
     void DecreaseRef();
     bool UpdateBPFConfig(BPFSecurityPipelineType);
+=======
+    void Start();
+    void Stop();
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
 
     // 其他函数注册：配置注册、注销等
     void AddSecurityOptions(const std::string& name,
@@ -62,6 +76,7 @@ public:
                             const PipelineContext* ctx);
     void RemoveSecurityOptions(const std::string& name, size_t index);
 
+<<<<<<< HEAD
     // handle process secure event
     void HandleProcessSecureEvent(std::unique_ptr<AbstractSecurityEvent>&& event);
     void HandleBatchProcessSecureEvents(std::vector<std::unique_ptr<AbstractSecurityEvent>>&& events);
@@ -78,11 +93,17 @@ private:
 
     void Init();
 
+=======
+private:
+    SecurityServer() = default;
+    ~SecurityServer() = default;
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
 
     bool mIsRunning = false;
     // TODO: 目前配置更新时，会停止ebpf探针、重新加载配置、重新启动ebpf探针，后续优化时需要考虑这里的并发问题
     std::unordered_map<std::string, SecurityConfig> mInputConfigMap;
     // std::unordered_map<pair<std::string, size_t>, const pointer*> mEbpfPointerMap;
+<<<<<<< HEAD
     std::once_flag once_;
     std::thread core_thread_;
     volatile int flag_;
@@ -93,6 +114,8 @@ private:
     SecurityConfig network_config_;
     SecurityConfig process_config_;
     SecurityConfig file_config_;
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
 };
 
 } // namespace logtail

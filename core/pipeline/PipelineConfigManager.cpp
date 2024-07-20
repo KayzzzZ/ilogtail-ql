@@ -29,7 +29,12 @@
 #include "shennong/ShennongManager.h"
 #include "streamlog/StreamLogManager.h"
 #endif
+<<<<<<< HEAD:core/pipeline/PipelineConfigManager.cpp
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
+=======
+#include "ebpf/observer/ObserverServer.h"
+#include "ebpf/security/SecurityServer.h"
+>>>>>>> f7ffe4f5 (add ebpf input (#1557)):core/pipeline/PipelineManager.cpp
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
 
@@ -233,6 +238,9 @@ void PipelineManager::StopAllPipelines() {
     ObserverManager::GetInstance()->HoldOn(true);
 #endif
     FileServer::GetInstance()->Stop();
+    // ebpf
+    SecurityServer::GetInstance()->Stop();
+    ObserverServer::GetInstance()->Stop();
 
     Sender::Instance()->SetQueueUrgent();
     bool logProcessFlushFlag = false;

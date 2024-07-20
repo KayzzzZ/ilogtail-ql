@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "ebpf/security/SecurityServer.h"
+<<<<<<< HEAD
 #include "queue/ProcessQueueManager.h"
 #include "queue/ProcessQueueItem.h"
 #include "common/MachineInfoUtil.h"
@@ -35,29 +36,45 @@
 DEFINE_FLAG_BOOL(secure_cb_use_class_method, "whether use class method as callback or not, default is true", true);
 DEFINE_FLAG_BOOL(secure_enable_libbpf_debug, "whether enable libbpf debug for processsecure or not, default is true", false);
 DEFINE_FLAG_BOOL(secure_enable_ebpf_feature, "whether enable secure ebpf feature or not, default is false", false);
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
 
 
 namespace logtail {
 
 // 负责接收ebpf返回的数据，然后将数据推送到对应的队列中
 // TODO: 目前暂时没有考虑并发Start的问题
+<<<<<<< HEAD
 
 // input 代码 + 联调安全
 void SecurityServer::Start(BPFSecurityPipelineType type) {
     if (mIsRunning) {
         return;
     } else {
+=======
+void SecurityServer::Start() {
+    if (mIsRunning) {
+        return;
+    } else {
+        mIsRunning = true;
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
         // TODO: 创建一个线程，用于接收ebpf返回的数据，并将数据推送到对应的队列中
         LOG_INFO(sLogger, ("security ebpf server", "started"));
     }
 }
 
+<<<<<<< HEAD
 void SecurityServer::Stop(BPFSecurityPipelineType type) {
     // TODO: ebpf_stop(); 停止所有类型的ebpf探针
 }
 
 void SecurityServer::Stop() {
     logtail::ebpf::SourceManager::GetInstance()->StopProcessProbe();
+=======
+void SecurityServer::Stop() {
+    // TODO: ebpf_stop(); 停止所有类型的ebpf探针
+    mIsRunning = false;
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
 }
 
 // 插件配置注册逻辑
@@ -72,17 +89,26 @@ void SecurityServer::AddSecurityOptions(const std::string& name,
     switch (options->mFilterType) {
         case SecurityFilterType::FILE: {
             // TODO: ebpf_start(type);
+<<<<<<< HEAD
             file_config_ = std::make_pair(options, ctx);
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
             break;
         }
         case SecurityFilterType::PROCESS: {
             // TODO: ebpf_start(type);
+<<<<<<< HEAD
             process_config_ = std::make_pair(options, ctx);
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
             break;
         }
         case SecurityFilterType::NETWORK: {
             // TODO: ebpf_start(type);
+<<<<<<< HEAD
             network_config_ = std::make_pair(options, ctx);
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
             break;
         }
         default:
@@ -97,20 +123,29 @@ void SecurityServer::RemoveSecurityOptions(const std::string& name, size_t index
     switch (mInputConfigMap[key].first->mFilterType) {
         case SecurityFilterType::FILE: {
             // TODO: ebpf_stop(type);
+<<<<<<< HEAD
             StopBPF(BPFSecurityPipelineType::PIPELINE_FILE);
             file_config_ = std::make_pair(nullptr, nullptr);
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
             break;
         }
         case SecurityFilterType::PROCESS: {
             // TODO: ebpf_stop(type);
+<<<<<<< HEAD
             StopBPF(BPFSecurityPipelineType::PIPELINE_PROCESS);
             process_config_ = std::make_pair(nullptr, nullptr);
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
             break;
         }
         case SecurityFilterType::NETWORK: {
             // TODO: ebpf_stop(type);
+<<<<<<< HEAD
             StopBPF(BPFSecurityPipelineType::PIPELINE_NETWORK);
             network_config_ = std::make_pair(nullptr, nullptr);
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
             break;
         }
         default:
@@ -119,6 +154,7 @@ void SecurityServer::RemoveSecurityOptions(const std::string& name, size_t index
     mInputConfigMap.erase(key);
 }
 
+<<<<<<< HEAD
 void SecurityServer::Init() {}
 
 void HandleSecureEvent(std::unique_ptr<AbstractSecurityEvent> event) {
@@ -400,3 +436,6 @@ void SecurityServer::DecreaseRef() {
 }
 
 } // namespace logtail
+=======
+} // namespace logtail
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))

@@ -30,16 +30,23 @@ bool InputEBPFNetworkSecurity::Init(const Json::Value& config, uint32_t& pluginI
 
 bool InputEBPFNetworkSecurity::Start() {
     SecurityServer::GetInstance()->AddSecurityOptions(mContext->GetConfigName(), mIndex, &mSecurityOptions, mContext);
+<<<<<<< HEAD
     SecurityServer::GetInstance()->InitBPF(BPFSecurityPipelineType::PIPELINE_NETWORK);
+=======
+    SecurityServer::GetInstance()->Start();
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
     return true;
 }
 
 bool InputEBPFNetworkSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
         // TODO: ?
+<<<<<<< HEAD
         SecurityServer::GetInstance()->AddSecurityOptions(mContext->GetConfigName(), mIndex, &mSecurityOptions, mContext);
         return SecurityServer::GetInstance()->UpdateBPFConfig(BPFSecurityPipelineType::PIPELINE_NETWORK);
 
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
     }
     SecurityServer::GetInstance()->RemoveSecurityOptions(mContext->GetConfigName(), mIndex);
     return true;

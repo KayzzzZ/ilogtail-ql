@@ -29,14 +29,22 @@ bool InputEBPFProcessSecurity::Init(const Json::Value& config, uint32_t& pluginI
 
 bool InputEBPFProcessSecurity::Start() {
     SecurityServer::GetInstance()->AddSecurityOptions(mContext->GetConfigName(), mIndex, &mSecurityOptions, mContext);
+<<<<<<< HEAD
     SecurityServer::GetInstance()->InitBPF(BPFSecurityPipelineType::PIPELINE_PROCESS);
+=======
+    SecurityServer::GetInstance()->Start();
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
     return true;
 }
 
 bool InputEBPFProcessSecurity::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
+<<<<<<< HEAD
         SecurityServer::GetInstance()->AddSecurityOptions(mContext->GetConfigName(), mIndex, &mSecurityOptions, mContext);
         return SecurityServer::GetInstance()->UpdateBPFConfig(BPFSecurityPipelineType::PIPELINE_PROCESS);
+=======
+        // TODO: ?
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
     }
     SecurityServer::GetInstance()->RemoveSecurityOptions(mContext->GetConfigName(), mIndex);
     return true;

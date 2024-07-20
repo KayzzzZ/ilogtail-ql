@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "ebpf/observer/ObserverServer.h"
+<<<<<<< HEAD
 #include "common/RuntimeUtil.h"
 #include "ebpf/SourceManager.h"
 #include "models/SpanEvent.h"
@@ -25,32 +26,47 @@
 #include <thread>
 #include <mutex>
 #include <iostream>
+=======
+
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
 
 namespace logtail {
 
 // 负责接收ebpf返回的数据，然后将数据推送到对应的队列中
 // TODO: 目前暂时没有考虑并发Start的问题
+<<<<<<< HEAD
 void ObserverServer::Start(BPFObserverPipelineType type) {
     if (mIsRunning) {
         return;
     } else {
         ObserverServer::InitBPF();
         mIsRunning = true;
+=======
+void ObserverServer::Start() {
+    if (mIsRunning) {
+        return;
+    } else {
+        mIsRunning = false;
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
         // TODO: 创建一个线程，用于接收ebpf返回的数据，并将数据推送到对应的队列中
         LOG_INFO(sLogger, ("observer ebpf server", "started"));
     }
 }
 
+<<<<<<< HEAD
 void ObserverServer::Stop(BPFObserverPipelineType type) {
     // TODO: ebpf_stop(); 停止所有类型的ebpf探针
     mIsRunning = false;
 }
 
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
 void ObserverServer::Stop() {
     // TODO: ebpf_stop(); 停止所有类型的ebpf探针
     mIsRunning = false;
 }
 
+<<<<<<< HEAD
 // FOR APP METRICS
 void GenerateRequestsTotalMetrics(PipelineEventGroup& group, std::unique_ptr<Measure>& measure, uint64_t ts) {
     if (measure->type_ != MeasureType::MEASURE_TYPE_APP) return;
@@ -334,6 +350,8 @@ void ObserverServer::HandleSpans(std::vector<std::unique_ptr<ApplicationBatchSpa
 
 }
 
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
 // 插件配置注册逻辑
 // 负责启动对应的ebpf程序
 void ObserverServer::AddObserverOptions(const std::string& name,
@@ -346,6 +364,7 @@ void ObserverServer::AddObserverOptions(const std::string& name,
     switch (options->mType) {
         case ObserverType::FILE: {
             // TODO: ebpf_start(type);
+<<<<<<< HEAD
             file_config_ = std::make_pair(options, ctx);
             break;
         }
@@ -355,6 +374,16 @@ void ObserverServer::AddObserverOptions(const std::string& name,
         }
         case ObserverType::NETWORK: {
             network_config_ = std::make_pair(options, ctx);
+=======
+            break;
+        }
+        case ObserverType::PROCESS: {
+            // TODO: ebpf_start(type);
+            break;
+        }
+        case ObserverType::NETWORK: {
+            // TODO: ebpf_start(type);
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
             break;
         }
         default:
@@ -369,6 +398,7 @@ void ObserverServer::RemoveObserverOptions(const std::string& name, size_t index
     // TODO: 目前一种类型的input只能处理一个，后续需要修改
     switch (mInputConfigMap[key].first->mType) {
         case ObserverType::FILE: {
+<<<<<<< HEAD
             file_config_ = std::make_pair(nullptr, nullptr);
             // TODO: ebpf_stop(type);
             StopBPF();
@@ -377,12 +407,21 @@ void ObserverServer::RemoveObserverOptions(const std::string& name, size_t index
         case ObserverType::PROCESS: {
             process_config_ = std::make_pair(nullptr, nullptr);
             StopBPF();
+=======
+            // TODO: ebpf_stop(type);
+            break;
+        }
+        case ObserverType::PROCESS: {
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
             // TODO: ebpf_stop(type);
             break;
         }
         case ObserverType::NETWORK: {
+<<<<<<< HEAD
             network_config_ = std::make_pair(nullptr, nullptr);
             StopBPF();
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
             // TODO: ebpf_stop(type);
             break;
         }
@@ -392,6 +431,7 @@ void ObserverServer::RemoveObserverOptions(const std::string& name, size_t index
     mInputConfigMap.erase(key);
 }
 
+<<<<<<< HEAD
 void ObserverServer::Init() {
     InitBPF();
 }
@@ -425,4 +465,6 @@ void ObserverServer::CollectEvents() {
     
 }
 
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
 } // namespace logtail

@@ -29,16 +29,23 @@ bool InputEBPFProcessObserver::Init(const Json::Value& config, uint32_t& pluginI
 
 bool InputEBPFProcessObserver::Start() {
     ObserverServer::GetInstance()->AddObserverOptions(mContext->GetConfigName(), mIndex, &mObserverOptions, mContext);
+<<<<<<< HEAD
     ObserverServer::GetInstance()->Start(BPFObserverPipelineType::PIPELINE_PROCESS);
+=======
+    ObserverServer::GetInstance()->Start();
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
     return true;
 }
 
 bool InputEBPFProcessObserver::Stop(bool isPipelineRemoving) {
     if (!isPipelineRemoving) {
         // TODO: ?
+<<<<<<< HEAD
         ObserverServer::GetInstance()->AddObserverOptions(mContext->GetConfigName(), mIndex, &mObserverOptions, mContext);
         // TODO update @qianlu.kk
         return true;
+=======
+>>>>>>> f7ffe4f5 (add ebpf input (#1557))
     }
     ObserverServer::GetInstance()->RemoveObserverOptions(mContext->GetConfigName(), mIndex);
     return true;
