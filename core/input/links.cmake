@@ -14,6 +14,18 @@
 # limitations under the License.
 # This file is used to link external source files in input directory
 
+<<<<<<< HEAD:core/input/links.cmake
 macro(input_link target_name)
     # link external libraries
 endmacro()
+=======
+cmake_minimum_required(VERSION 3.22)
+project(ebpf)
+
+file(GLOB_RECURSE LIB_SOURCE_FILES *.cpp *.h)
+append_source_files(LIB_SOURCE_FILES)
+add_library(${PROJECT_NAME} STATIC ${LIB_SOURCE_FILES})
+target_link_libraries(${PROJECT_NAME} common)
+target_link_libraries(${PROJECT_NAME} logger)
+target_link_libraries(${PROJECT_NAME} pipeline)
+>>>>>>> 4c91bcbd (1. add event pipeline event group):core/ebpf/CMakeLists.txt
