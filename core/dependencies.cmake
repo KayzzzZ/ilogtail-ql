@@ -60,6 +60,7 @@ set(DEP_NAME_LIST
         crypto
         leveldb
         uuid
+        snappy
         )
 
 if (NOT NO_TCMALLOC)
@@ -274,6 +275,19 @@ macro(link_zstd target_name)
         target_link_libraries(${target_name}
                 debug "zstdstaticd"
                 optimized "zstdstatic")
+    endif ()
+endmacro()
+
+# snappy
+macro(link_snappy target_name)
+    if (snappy_${LINK_OPTION_SUFFIX})
+        target_link_libraries(${target_name} "${snappy_${LINK_OPTION_SUFFIX}}")
+    elseif (UNIX)
+        target_link_libraries(${target_name} "${snappy_${LIBRARY_DIR_SUFFIX}}/libsnappy.a")
+    elseif (MSVC)
+        target_link_libraries(${target_name}
+                debug "snappystaticd"
+                optimized "snappystatic")
     endif ()
 endmacro()
 
