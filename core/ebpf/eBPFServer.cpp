@@ -28,6 +28,31 @@
 namespace logtail {
 namespace ebpf {
 
+bool eBPFServer::CheckArchAndKernel(nami::PluginType type) {
+    return CheckArch() && CheckKernelVersion(type);
+}
+
+bool eBPFServer::CheckKernelVersion(nami::PluginType type) {
+
+    return true;
+}
+
+bool eBPFServer::CheckArch() {
+#if defined(__x86_64__) || defined(_M_X64)
+    return true;
+#elif defined(__i386__) || defined(_M_IX86)
+    return false;
+#elif defined(__ARM_ARCH)
+    return false;
+#elif defined(__aarch64__)
+    return false;
+#elif defined(__powerpc__) || defined(__PPC__)
+    return false;
+#else
+    return false;
+#endif
+}
+
 void eBPFServer::Init() {
     if (mInited) {
         return;

@@ -39,6 +39,8 @@ public:
 
     void Init();
 
+    bool CheckArchAndKernel(nami::PluginType type);
+
     static eBPFServer* GetInstance() {
         static eBPFServer instance;
         return &instance;
@@ -59,6 +61,8 @@ public:
     bool SuspendPlugin(const std::string& pipeline_name, nami::PluginType type);
 
 private:
+    bool CheckArch();
+    bool CheckKernelVersion(nami::PluginType type);
     bool StartPluginInternal(const std::string& pipeline_name, uint32_t plugin_index,
                         nami::PluginType type, 
                         const logtail::PipelineContext* ctx, 
