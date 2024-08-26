@@ -329,7 +329,7 @@ void eBPFServerUnittest::GenerateBatchMeasure(nami::NamiHandleBatchMeasureFunc c
                 {"callType", "http_client"},
                 {"source", "ebpf"},
             };
-            NetSingleMeasure* sm = new NetSingleMeasure;
+            NetSingleMeasre* sm = new NetSingleMeasre;
             sm->recv_byte_total_ = 15631 + generateRandomInt(500);
             sm->send_byte_total_ = 18676 + generateRandomInt(400);
             sm->send_pkt_total_ = 203 + generateRandomInt(50);
@@ -401,7 +401,7 @@ void eBPFServerUnittest::GenerateBatchMeasure(nami::NamiHandleBatchMeasureFunc c
                     {"callType", "conn_stats"},
                     {"source", "ebpf"},
                 };
-                NetSingleMeasure* sm = new NetSingleMeasure;
+                NetSingleMeasre* sm = new NetSingleMeasre;
                 sm->recv_byte_total_ = 15631 + generateRandomInt(500);
                 sm->send_byte_total_ = 18676 + generateRandomInt(400);
                 sm->recv_pkt_total_ = 203 + generateRandomInt(50);

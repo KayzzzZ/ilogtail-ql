@@ -100,14 +100,17 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
         nami::ObserverNetworkOption* opts = std::get<nami::ObserverNetworkOption*>(options);
         if (opts->mEnableMetric) {
             nconfig.measure_cb_ = [this](auto events, auto ts) { return mMeterCB->handle(std::move(events), ts); };
+            nconfig.enable_metric_ = true;
             mMeterCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableSpan) {
             nconfig.span_cb_ = [this](auto events) { return mSpanCB->handle(std::move(events)); };
+            nconfig.enable_span_ = true;
             mSpanCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableEvent) {
             nconfig.event_cb_ = [this](auto events) { return mEventCB->handle(std::move(events)); };
+            nconfig.enable_event_ = true;
             mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
 

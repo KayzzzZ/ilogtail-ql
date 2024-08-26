@@ -125,6 +125,7 @@ void EventHandler::handle(std::vector<std::unique_ptr<ApplicationBatchEvent>>&& 
     for (auto& appEvents : events) {
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
+        // pid
         for (auto& event : appEvents->events_) {
             auto logEvent = eventGroup.AddLogEvent();
             for (auto& tag : event->GetAllTags()) {
@@ -184,13 +185,13 @@ const static std::string npm_send_pkt_total = "arms_npm_sent_packets_total";
 const static std::string npm_send_byte_total = "arms_npm_sent_bytes_total";
 
 // FOR NET METRICS
-GENERATE_METRICS(GenerateTcpDropTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_tcp_drop_total, tcp_drop_total_)
-GENERATE_METRICS(GenerateTcpRetransTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_tcp_retrans_total, tcp_retran_total_)
-GENERATE_METRICS(GenerateTcpConnectionTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_tcp_count_total, tcp_connect_total_)
-GENERATE_METRICS(GenerateTcpRecvPktsTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_recv_pkt_total, recv_pkt_total_)
-GENERATE_METRICS(GenerateTcpRecvBytesTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_recv_byte_total, recv_byte_total_)
-GENERATE_METRICS(GenerateTcpSendPktsTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_send_pkt_total, send_pkt_total_)
-GENERATE_METRICS(GenerateTcpSendBytesTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasure, npm_send_byte_total, send_byte_total_)
+GENERATE_METRICS(GenerateTcpDropTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasre, npm_tcp_drop_total, tcp_drop_total_)
+GENERATE_METRICS(GenerateTcpRetransTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasre, npm_tcp_retrans_total, tcp_retran_total_)
+GENERATE_METRICS(GenerateTcpConnectionTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasre, npm_tcp_count_total, tcp_connect_total_)
+GENERATE_METRICS(GenerateTcpRecvPktsTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasre, npm_recv_pkt_total, recv_pkt_total_)
+GENERATE_METRICS(GenerateTcpRecvBytesTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasre, npm_recv_byte_total, recv_byte_total_)
+GENERATE_METRICS(GenerateTcpSendPktsTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasre, npm_send_pkt_total, send_pkt_total_)
+GENERATE_METRICS(GenerateTcpSendBytesTotalMetrics, MeasureType::MEASURE_TYPE_NET, NetSingleMeasre, npm_send_byte_total, send_byte_total_)
 
 void ArmsSpanHandler::handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&& spans) {
     if (spans.empty()) return;
