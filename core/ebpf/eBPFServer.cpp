@@ -17,6 +17,7 @@
 #include <string>
 #include <algorithm>
 #include <gflags/gflags.h>
+#include <random>
 
 #include "app_config/AppConfig.h"
 #include "ebpf/config.h"
@@ -27,6 +28,9 @@
 #include "common/MachineInfoUtil.h"
 #include "monitor/PluginMetricManager.h"
 #include "common/Lock.h"
+#include "pipeline/queue/ProcessQueueItem.h"
+#include "pipeline/queue/ProcessQueueManager.h"
+
 
 DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
@@ -199,6 +203,260 @@ void eBPFServer::Stop() {
     if (mFileSecureCB) mFileSecureCB->UpdateContext(nullptr, -1, -1);
 }
 
+void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
+    LOG_INFO(sLogger, ("[ObserverServer] enter metric generator", ""));
+    const std::vector<std::string> app_metric_names = {
+                            "arms_rpc_requests_count", 
+                            "arms_rpc_requests_slow_count", 
+                            "arms_rpc_requests_error_count",
+                            "arms_rpc_requests_seconds",
+                            "arms_rpc_requests_by_status_count",
+                        };
+    const std::vector<std::string> tcp_metrics_names = {
+                            "arms_npm_tcp_rtt_avg", 
+                            "arms_npm_tcp_count_by_state", 
+                            "arms_npm_tcp_conn_stats_count",
+                            "arms_npm_tcp_drop_count",
+                            "arms_npm_tcp_retrans_total",
+                            "arms_npm_recv_packets_total",
+                            "arms_npm_sent_packets_total",
+                            "arms_npm_recv_bytes_total",
+                            "arms_npm_sent_bytes_total",
+    };
+    // generate metrics
+    while (mGenerateFlag) {
+        auto now = std::chrono::system_clock::now();
+        auto duration = now.time_since_epoch();
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        std::vector<std::unique_ptr<ProcessQueueItem>> items;
+        // construct vector<PipelineEventGroup>
+        // 1000 timeseries for app
+        std::vector<std::string> app_ids = {
+            "eeeb8df999f59f569da84d27fa408a94", 
+            "deddf8ef215107d8fd37540ac4e3291b", 
+            "52abe1564d8ee3fea66e9302fc21d80d", 
+            "87f79be5ab74d72b4a10b62c02dc7f34", 
+            "1796627f8e0b7fbba042c145820311f9"
+        };
+        for (size_t i = 0; i < app_ids.size(); i ++) {
+            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
+            PipelineEventGroup mTestEventGroup(mSourceBuffer);
+            mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
+            mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
+            mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.55");
+            mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
+            mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            for (size_t j = 0 ; j < app_metric_names.size(); j ++) {
+                for (size_t z = 0; z < 10; z ++ ) {
+                    auto metricsEvent = mTestEventGroup.AddMetricEvent();
+                    metricsEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
+                    metricsEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
+                    metricsEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
+                    metricsEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
+                    metricsEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local" + std::to_string(z)));
+                    metricsEvent->SetTag(std::string("rpcType"), std::string("0"));
+                    metricsEvent->SetTag(std::string("callType"), std::string("http"));
+                    metricsEvent->SetTag(std::string("statusCode"), std::string("200"));
+                    metricsEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
+                    metricsEvent->SetName(app_metric_names[j]);
+                    metricsEvent->SetValue(UntypedSingleValue{10.0});
+                    metricsEvent->SetTimestamp(seconds);
+                }
+            }
+            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(mTestEventGroup), idx);
+            items.emplace_back(std::move(item));
+        }
+        // tcp_metrics
+        for (size_t i = 0; i < app_ids.size(); i ++)  {
+            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
+            PipelineEventGroup mTestEventGroup(mSourceBuffer);
+            mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
+            mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
+            mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.44");
+            mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
+            mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            for (size_t j = 0 ; j < tcp_metrics_names.size(); j ++) {
+                for (size_t z = 0; z < 20; z ++ ) {
+                    auto metricsEvent = mTestEventGroup.AddMetricEvent();
+                    metricsEvent->SetName(tcp_metrics_names[j]);
+                    metricsEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
+                    metricsEvent->SetTag(std::string("workloadKind"), std::string("qianlu"));
+                    metricsEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
+                    metricsEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
+                    metricsEvent->SetTag(std::string("dest_ip"), std::string("10.54.0." + std::to_string(z)));
+                    metricsEvent->SetTag(std::string("callType"), std::string("conn_stats"));
+                    metricsEvent->SetValue(UntypedSingleValue{20.0});
+                    metricsEvent->SetTimestamp(seconds);
+                }
+            }
+            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(mTestEventGroup), idx);
+            items.emplace_back(std::move(item));
+        }
+        // push vector<PipelineEventGroup>
+        for (size_t i = 0; i < items.size(); i ++) {
+            auto status =ProcessQueueManager::GetInstance()->PushQueue(key, std::move(items[i]));
+            if (status) {
+                LOG_WARNING(sLogger, ("[Metrics] push queue failed! status", status));
+            } else {
+                LOG_INFO(sLogger, ("[Metrics] push queue success!", ""));
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(15));
+    }
+    LOG_INFO(sLogger, ("[Observer] exit metrics generator", ""));
+}
+
+std::string GenerateRandomString(size_t length) {
+    const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    std::random_device rd;  // 用于获取随机种子
+    std::mt19937 generator(rd());  // 标准梅森旋转算法的随机数生成器
+    std::uniform_int_distribution<> distribution(0, chars.size() - 1);
+    std::string result;
+    for (size_t i = 0; i < length; ++i) {
+        result += chars[distribution(generator)];
+    }
+    return result;
+}
+
+void eBPFServer::GenerateSpan(logtail::QueueKey key, uint32_t idx) {
+    LOG_INFO(sLogger, ("[ObserverServer] enter span generator", ""));
+    // generate metrics
+    while (mGenerateFlag) {
+        auto now = std::chrono::system_clock::now();
+        auto duration = now.time_since_epoch();
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        auto nano = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+        std::vector<std::unique_ptr<ProcessQueueItem>> items;
+        // construct vector<PipelineEventGroup>
+        // 1000 timeseries for app
+        std::vector<std::string> app_ids = {
+            "eeeb8df999f59f569da84d27fa408a94", 
+            "deddf8ef215107d8fd37540ac4e3291b", 
+            "52abe1564d8ee3fea66e9302fc21d80d", 
+            "87f79be5ab74d72b4a10b62c02dc7f34", 
+            "1796627f8e0b7fbba042c145820311f9"
+        };
+        std::vector<std::string> service_name = {
+            "test-service-1", 
+            "test-service-2", 
+            "test-service-3", 
+            "test-service-4", 
+            "test-service-5"
+        };
+        for (size_t i = 0; i < app_ids.size(); i ++) {
+            std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
+            PipelineEventGroup mTestEventGroup(mSourceBuffer);
+            mTestEventGroup.SetTag(std::string("serviceName"), service_name[i]);
+            mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
+            mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.55");
+            mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
+            mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            for (size_t j = 0 ; j < 25; j ++) {
+                auto spanEvent = mTestEventGroup.AddSpanEvent();
+                // spanEvent->SetScopeTag();
+                spanEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
+                spanEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
+                spanEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
+                spanEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
+                spanEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/" + std::to_string(j)));
+                spanEvent->SetTag(std::string("rpcType"), std::string("0"));
+                spanEvent->SetTag(std::string("callType"), std::string("http"));
+                spanEvent->SetTag(std::string("statusCode"), std::string("200"));
+                spanEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
+                spanEvent->SetName("/oneagent/qianlu/local/" + std::to_string(j));
+                spanEvent->SetKind(SpanEvent::Kind::Server);
+                std::string trace_id = GenerateRandomString(32);
+                std::string span_id = GenerateRandomString(16);
+                spanEvent->SetSpanId(span_id);
+                spanEvent->SetTraceId(trace_id);
+                spanEvent->SetStartTimeNs(nano - 5e6);
+                spanEvent->SetEndTimeNs(nano);
+
+                spanEvent->SetTimestamp(seconds);
+            }
+            for (size_t j = 0 ; j < 25; j ++) {
+                auto spanEvent = mTestEventGroup.AddSpanEvent();
+                spanEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
+                spanEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
+                spanEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
+                spanEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
+                spanEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/" + std::to_string(j)));
+                spanEvent->SetTag(std::string("rpcType"), std::string("25"));
+                spanEvent->SetTag(std::string("callType"), std::string("http-client"));
+                spanEvent->SetTag(std::string("statusCode"), std::string("200"));
+                spanEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
+                spanEvent->SetName("/oneagent/qianlu/local/" + std::to_string(j));
+                spanEvent->SetKind(SpanEvent::Kind::Client);
+                std::string trace_id = GenerateRandomString(32);
+                std::string span_id = GenerateRandomString(16);
+                spanEvent->SetSpanId(span_id);
+                spanEvent->SetTraceId(trace_id);
+                spanEvent->SetStartTimeNs(nano - 5e9);
+                spanEvent->SetEndTimeNs(nano);
+
+                spanEvent->SetTimestamp(seconds);
+            }
+            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(mTestEventGroup), idx);
+            items.emplace_back(std::move(item));
+        }
+        // push vector<PipelineEventGroup>
+        for (size_t i = 0; i < items.size(); i ++) {
+            auto status =ProcessQueueManager::GetInstance()->PushQueue(key, std::move(items[i]));
+            if (status) {
+                LOG_WARNING(sLogger, ("[Span] push queue failed! status", status));
+            } else {
+                LOG_INFO(sLogger, ("[Span] push queue success!", ""));
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+    LOG_INFO(sLogger, ("[Observer] exit span generator", ""));
+}
+
+void eBPFServer::GenerateAgentInfo(logtail::QueueKey key, uint32_t idx) {
+    LOG_INFO(sLogger, ("[ObserverServer] enter agentinfo generator", ""));
+    while(mGenerateFlag) {
+        std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        const std::string app_id_key = "appId";
+        const std::string agentIdKey = "agentId";
+        const std::string app_prefix = "app-";
+        const std::string agent_version = "1.0.0-rc";
+        const std::string vmVersion = "xxxx";
+        const std::string startTimestamp = "1729479979167"; // ms
+        const std::string startTimestampKey = "startTimeStamp";
+        const std::string appNameKey = "appName";
+        const std::string appNamePrefix = "test-ebpf-app-";
+        const std::string ipKey = "ip";
+        const std::string ip_prefix = "30.221.146.";
+
+        const std::string agentVersionKey = "agentVersion";
+
+        for (int i = 0; i < 50; i ++) {
+            std::string app = app_prefix + std::to_string(i);
+            std::string ip = ip_prefix + std::to_string(i);
+            auto logEvent = eventGroup.AddLogEvent();
+            logEvent->SetContent(app_id_key, app);
+            logEvent->SetContent(ipKey, ip);
+            logEvent->SetContent(agentIdKey, app);
+            logEvent->SetContent(appNameKey, appNamePrefix + std::to_string(i));
+            logEvent->SetContent(startTimestampKey, startTimestamp);
+            logEvent->SetContent(agentVersionKey, "0.0.1");
+            // auto now = std::chrono::steady_clock::now();
+            logEvent->SetTimestamp(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+        }
+        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), idx);
+        auto res = ProcessQueueManager::GetInstance()->PushQueue(key, std::move(item));
+        if (res) {
+            LOG_WARNING(sLogger, ("[AgentInfo] push queue failed! status", res));
+        } else {
+            LOG_INFO(sLogger, ("[AgentInfo] push queue success!", ""));
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(60));
+    }
+    LOG_INFO(sLogger, ("[Observer] exit agentinfo generator", ""));
+}
+
 bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t plugin_index,
                         nami::PluginType type, 
                         const logtail::PipelineContext* ctx, 
@@ -241,28 +499,32 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
     case nami::PluginType::NETWORK_OBSERVE:{
         nami::NetworkObserveConfig nconfig;
         nami::ObserverNetworkOption* opts = std::get<nami::ObserverNetworkOption*>(options);
+        mGenerateFlag = true;
         if (opts->mEnableMetric) {
             nconfig.enable_metric_ = true;
             nconfig.measure_cb_ = [this](auto events, auto ts) { return mMeterCB->handle(std::move(events), ts); };
-            nconfig.enable_metric_ = true;
             mMeterCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            mLogMockThread = std::thread(&eBPFServer::GenerateAgentInfo, this, ctx->GetProcessQueueKey(), plugin_index);
+            mMetricMockThread = std::thread(&eBPFServer::GenerateMetric, this, ctx->GetProcessQueueKey(), plugin_index);
+            // mTraceMockThread = std::thread(&eBPFServer::GenerateSpan, this, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableSpan) {
             nconfig.enable_span_ = true;
             nconfig.span_cb_ = [this](auto events) { return mSpanCB->handle(std::move(events)); };
-            nconfig.enable_span_ = true;
             mSpanCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            mTraceMockThread = std::thread(&eBPFServer::GenerateSpan, this, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableLog) {
             nconfig.enable_event_ = true;
             nconfig.event_cb_ = [this](auto events) { return mEventCB->handle(std::move(events)); };
-            nconfig.enable_event_ = true;
             mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            mLogMockThread = std::thread(&eBPFServer::GenerateAgentInfo, this, ctx->GetProcessQueueKey(), plugin_index);
         }
 
         config = std::move(nconfig);
         eBPFConfig->config_ = config;
         ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
+
         break;
     }
 
@@ -331,6 +593,12 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, nami::PluginTyp
     } else {
         LOG_WARNING(sLogger, ("prev pipeline", prev_pipeline)("curr pipeline", pipeline_name));
         return true;
+    }
+    if (type == nami::PluginType::NETWORK_OBSERVE) {
+        mGenerateFlag = false;
+        if (mMetricMockThread.joinable()) mMetricMockThread.join();
+        if (mTraceMockThread.joinable()) mTraceMockThread.join();
+        if (mLogMockThread.joinable()) mLogMockThread.join();
     }
     bool ret = mSourceManager->StopPlugin(type);
     // UpdateContext must after than StopPlugin

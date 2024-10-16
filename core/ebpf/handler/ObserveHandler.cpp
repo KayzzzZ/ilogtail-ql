@@ -78,8 +78,11 @@ void OtelMeterHandler::handle(std::vector<std::unique_ptr<ApplicationBatchMeasur
         continue;
 #endif
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Otel Metrics] push queue failed!", ""));
+        auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
+        if (res) {
+            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Otel Metrics] push queue failed!", res));
+        } else {
+            LOG_INFO(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Otel Metrics] push queue success!", ""));
         }
         
     }
@@ -109,8 +112,11 @@ void OtelSpanHandler::handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&
         continue;
 #endif
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Span] push queue failed!", ""));
+        auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
+        if (res) {
+            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Otel Span] push queue failed!", res));
+        } else {
+            LOG_INFO(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Otel Span] push queue success!", ""));
         }
         
     }
@@ -142,8 +148,11 @@ void EventHandler::handle(std::vector<std::unique_ptr<ApplicationBatchEvent>>&& 
         continue;
 #endif
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Event] push queue failed!", ""));
+        auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
+        if (res) {
+            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Otel Event] push queue failed!", res));
+        } else {
+            LOG_INFO(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Otel Event] push queue success!", ""));
         }
     }
 }
