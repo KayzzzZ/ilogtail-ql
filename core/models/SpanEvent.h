@@ -146,6 +146,17 @@ public:
     void SetName(const std::string& name);
 
     Kind GetKind() const { return mKind; }
+    constexpr StringView GetKindString() const {
+        switch (mKind) {
+        case Kind::Unspecified: return "Unspecified";
+        case Kind::Internal:   return "Internal";
+        case Kind::Server:     return "Server";
+        case Kind::Client:     return "Client";
+        case Kind::Producer:   return "Producer";
+        case Kind::Consumer:   return "Consumer";
+        default:               return "Unknown";
+        }
+    }
     void SetKind(Kind kind) { mKind = kind; }
 
     uint64_t GetStartTimeNs() const { return mStartTimeNs; }
@@ -173,6 +184,14 @@ public:
 
     StatusCode GetStatus() const { return mStatus; }
     void SetStatus(StatusCode status) { mStatus = status; }
+    constexpr StringView GetStatusString() const {
+        switch (mStatus) {
+        case StatusCode::Unset: return "unset";
+        case StatusCode::Ok:   return "ok";
+        case StatusCode::Error:     return "error";
+        default:               return "";
+        }
+    }
 
     StringView GetScopeTag(StringView key) const;
     bool HasScopeTag(StringView key) const;

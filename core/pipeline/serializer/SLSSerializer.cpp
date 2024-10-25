@@ -31,6 +31,17 @@ const std::string METRIC_RESERVED_KEY_TIME_NANO = "__time_nano__";
 const std::string METRIC_LABELS_SEPARATOR = "|";
 const std::string METRIC_LABELS_KEY_VALUE_SEPARATOR = "#$#";
 
+const std::string TRACE_RESERVED_KEY_SPAN_NAME = "spanName";
+const std::string TRACE_RESERVED_KEY_SPAN_TAGS = "spanTags";
+const std::string TRACE_RESERVED_KEY_SCOPE_TAGS = "scopeTags";
+const std::string TRACE_RESERVED_KEY_TRACE_ID = "traceId";
+const std::string TRACE_RESERVED_KEY_SPAN_ID = "spanId";
+const std::string TRACE_RESERVED_KEY_PARENT_ID = "parentId";
+const std::string TRACE_RESERVED_KEY_SPAN_KIND = "spanKind";
+const std::string TRACE_RESERVED_KEY_SPAN_STATUS = "spanStatus";
+const std::string TRACE_RESERVED_KEY_START_TIME_NANO = "startTime";
+const std::string TRACE_RESERVED_KEY_END_TIME_NANO = "endTime";
+
 using namespace std;
 
 namespace logtail {
@@ -117,6 +128,68 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             logPtr = log->add_contents();
             logPtr->set_key(METRIC_RESERVED_KEY_NAME);
             logPtr->set_value(metricEvent.GetName().to_string());
+        } else if (e.Is<SpanEvent>()) {
+            const auto& spanEvent = e.Cast<SpanEvent>();
+            auto log = logGroup.add_logs();
+
+            // set trace_id span_id span_kind status etc
+            auto logPtr = log->add_contents();
+            logPtr->set_key(TRACE_RESERVED_KEY_TRACE_ID);
+            logPtr->set_value(spanEvent.GetTraceId().to_string());
+            logPtr = log->add_contents();
+            logPtr->set_key(TRACE_RESERVED_KEY_SPAN_ID);
+            logPtr->set_value(spanEvent.GetSpanId().to_string());
+            logPtr = log->add_contents();
+            logPtr->set_key(TRACE_RESERVED_KEY_PARENT_ID);
+            logPtr->set_value(spanEvent.GetParentSpanId().to_string());
+            logPtr = log->add_contents();
+            logPtr->set_key(TRACE_RESERVED_KEY_SPAN_NAME);
+            logPtr->set_value(spanEvent.GetName().to_string());
+            logPtr = log->add_contents();
+            logPtr->set_key(TRACE_RESERVED_KEY_SPAN_KIND);
+            logPtr->set_value(spanEvent.GetKindString().to_string());
+            logPtr = log->add_contents();
+            logPtr->set_key(TRACE_RESERVED_KEY_SPAN_STATUS);
+            logPtr->set_value(spanEvent.GetStatusString().to_string());
+
+            // set start/end timestamp
+            logPtr = log->add_contents();
+            logPtr->set_key(TRACE_RESERVED_KEY_START_TIME_NANO);
+            logPtr->set_value(std::to_string(spanEvent.GetStartTimeNs()));
+            logPtr = log->add_contents();
+            logPtr->set_key(TRACE_RESERVED_KEY_END_TIME_NANO);
+            logPtr->set_value(std::to_string(spanEvent.GetEndTimeNs()));
+            
+            // set tags
+            std::ostringstream oss;
+            bool hasPrev = false;
+            for (auto it = spanEvent.TagsBegin(); it != spanEvent.TagsEnd(); ++it) {
+                if (hasPrev) {
+                    oss << METRIC_LABELS_SEPARATOR;
+                }
+                hasPrev = true;
+                oss << it->first << METRIC_LABELS_KEY_VALUE_SEPARATOR << it->second;
+            }
+            logPtr = log->add_contents();
+            logPtr->set_key(TRACE_RESERVED_KEY_SPAN_TAGS);
+            logPtr->set_value(oss.str());
+
+            // set scope tags
+            for (auto it = spanEvent.ScopeTagsBegin(); it != spanEvent.ScopeTagsEnd(); ++it) {
+                if (hasPrev) {
+                    oss << METRIC_LABELS_SEPARATOR;
+                }
+                hasPrev = true;
+                oss << it->first << METRIC_LABELS_KEY_VALUE_SEPARATOR << it->second;
+            }
+            logPtr = log->add_contents();
+            logPtr->set_key(TRACE_RESERVED_KEY_SCOPE_TAGS);
+            logPtr->set_value(oss.str());
+
+            // set time, no need to set nanosecond for metric
+            log->set_time(spanEvent.GetTimestamp());
+
+            // TODO set span events and span links
         } else {
             errorMsg = "unsupported event type in event group";
             return false;
