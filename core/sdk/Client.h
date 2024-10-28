@@ -196,6 +196,7 @@ namespace sdk {
         std::unique_ptr<HttpSinkRequest>
         CreateAsynPostLogStoreLogsRequest(const std::string& project,
                                           const std::string& logstore,
+                                          const std::string& subpath,
                                           const std::string& body,
                                           std::map<std::string, std::string>& httpHeader,
                                           const std::string& hashKey,

@@ -183,7 +183,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             
             // set tags and scope tags
             Json::Value emptyJson;
-            bool hasPrev = false;
             for (auto it = spanEvent.TagsBegin(); it != spanEvent.TagsEnd(); ++it) {
                 emptyJson[it->first.to_string()] = it->second.to_string();
             }

@@ -273,7 +273,7 @@ namespace sdk {
                 project, logstore, compressedLogGroup, httpHeader,item);
         } else {
             return CreateAsynPostLogStoreLogsRequest(
-                project, logstore, compressedLogGroup, httpHeader, hashKey, hashKeySeqID, item);
+                project, logstore, "", compressedLogGroup, httpHeader, hashKey, hashKeySeqID, item);
         }
     }
 
@@ -293,7 +293,7 @@ namespace sdk {
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(packageListData.size());
         httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
         return CreateAsynPostLogStoreLogsRequest(
-            project, logstore, packageListData, httpHeader, hashKey, kInvalidHashKeySeqID, item);
+            project, logstore, "", packageListData, httpHeader, hashKey, kInvalidHashKeySeqID, item);
     }
 
     void Client::SendRequest(const std::string& project,
@@ -346,17 +346,23 @@ namespace sdk {
     unique_ptr<HttpSinkRequest>
     Client::CreateAsynPostLogStoreLogsRequest(const std::string& project,
                                               const std::string& logstore,
+                                              const std::string& subpath,
                                               const std::string& body,
                                               std::map<std::string, std::string>& httpHeader,
                                               const std::string& hashKey,
                                               int64_t hashKeySeqID,
                                               SenderQueueItem* item) {
         string operation = LOGSTORES;
-        operation.append("/").append(logstore);
-        if (hashKey.empty())
-            operation.append("/shards/lb");
-        else
-            operation.append("/shards/route");
+        if (subpath.size()) {
+            operation = subpath;
+        } else {
+            operation.append("/").append(logstore);
+            if (hashKey.empty())
+                operation.append("/shards/lb");
+            else
+                operation.append("/shards/route");
+        }
+        
 
         httpHeader[CONTENT_MD5] = CalcMD5(body);
 

@@ -51,6 +51,7 @@ public:
     void TestFlushBatch() const;
     void TestInProcessingCount() const;
     void TestWaitAllItemsInProcessFinished() const;
+    void TestMultiFlusherAndRouter() const;
 
 protected:
     static void SetUpTestCase() {
@@ -2289,6 +2290,76 @@ void PipelineUnittest::OnInitVariousTopology() const {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new PipelineConfig(configName, std::move(configJson)));
     APSARA_TEST_FALSE(config->Parse());
+}
+
+void PipelineUnittest::TestMultiFlusherAndRouter() const {
+    unique_ptr<Json::Value> configJson;
+    string configStr, errorMsg;
+    unique_ptr<PipelineConfig> config;
+    unique_ptr<Pipeline> pipeline;
+    // new pipeline
+    configStr = R"(
+        {
+            "global": {
+                "ProcessPriority": 1
+            },
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/home/test.log"
+                    ]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "TelemetryType": "arms",
+                    "Project": "test_project",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                    "Match": {
+                        "Type": "tag",
+                        "Key": "data_type",
+                        "Value": "trace",
+                    }
+                },
+                {
+                    "Type": "flusher_sls",
+                    "TelemetryType": "arms",
+                    "Project": "test_project",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                    "Match": {
+                        "Type": "tag",
+                        "Key": "data_type",
+                        "Value": "metric",
+                    }
+                },
+                {
+                    "Type": "flusher_sls",
+                    "TelemetryType": "arms",
+                    "Project": "test_project",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                    "Match": {
+                        "Type": "tag",
+                        "Key": "data_type",
+                        "Value": "agent_info",
+                    }
+                },
+            ]
+        }
+    )";
+
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new PipelineConfig(configName, std::move(configJson)));
+    APSARA_TEST_TRUE(config->Parse());
+    pipeline.reset(new Pipeline());
+    APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
+
+    
 }
 
 void PipelineUnittest::TestProcessQueue() const {

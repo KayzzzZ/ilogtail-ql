@@ -410,6 +410,50 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     } else if (telemetryType == "metrics") {
         mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
                                                                : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
+    } else if (telemetryType == "arms") {
+        // Parse Match segment
+        const char* key = "Match";
+        const Json::Value* itr = config.find(key, key + strlen(key));
+        if (!itr) {
+            // Error
+            LOG_WARNING(sLogger, ("invalid config!", "telemetry arms need add match tags!"));
+            return false;
+        }
+
+        // Type
+        string type;
+        if (!GetMandatoryStringParam(config, "Type", type, errorMsg) || type != "tag") {
+            // error
+            return false;
+        }
+
+        // Key
+        std::string tagKey;
+        // Value
+        std::string tagValue;
+        const std::set<std::string> supportDataTypes = {
+            "trace",
+            "metric",
+            "agent_info",
+        };
+        if (!GetMandatoryStringParam(config, "Match.Key", tagKey, errorMsg) || 
+            !GetMandatoryStringParam(config, "Match.Value", tagValue, errorMsg) || 
+            tagKey != "data_type" || supportDataTypes.count(tagValue)) {
+            // error
+            return false;
+        }
+
+        if (tagValue == "trace") {
+            mSubpath = "/apm/metric/arms/v1/trace_log";
+            mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_TRACES;
+        } else if (tagValue == "metric") {
+            mSubpath = "/apm/metric/arms/v1/metric_log";
+            mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_METRICS;
+        } else if (tagValue == "agent_info") {
+            mSubpath = "/apm/metric/arms/v1/meta_log";
+            mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_LOGS;
+        }
+
     } else if (!telemetryType.empty() && telemetryType != "logs") {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
