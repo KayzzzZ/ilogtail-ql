@@ -20,6 +20,8 @@
 #include "common/compression/CompressType.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 
+#include <json/json.h>
+
 
 DEFINE_FLAG_INT32(max_send_log_group_size, "bytes", 10 * 1024 * 1024);
 
@@ -31,16 +33,36 @@ const std::string METRIC_RESERVED_KEY_TIME_NANO = "__time_nano__";
 const std::string METRIC_LABELS_SEPARATOR = "|";
 const std::string METRIC_LABELS_KEY_VALUE_SEPARATOR = "#$#";
 
-const std::string TRACE_RESERVED_KEY_SPAN_NAME = "spanName";
-const std::string TRACE_RESERVED_KEY_SPAN_TAGS = "spanTags";
-const std::string TRACE_RESERVED_KEY_SCOPE_TAGS = "scopeTags";
 const std::string TRACE_RESERVED_KEY_TRACE_ID = "traceId";
 const std::string TRACE_RESERVED_KEY_SPAN_ID = "spanId";
-const std::string TRACE_RESERVED_KEY_PARENT_ID = "parentId";
-const std::string TRACE_RESERVED_KEY_SPAN_KIND = "spanKind";
-const std::string TRACE_RESERVED_KEY_SPAN_STATUS = "spanStatus";
+const std::string TRACE_RESERVED_KEY_PARENT_ID = "parentSpanId";
+const std::string TRACE_RESERVED_KEY_SPAN_NAME = "spanName";
+const std::string TRACE_RESERVED_KEY_SERVICE_NAME = "serviceName";
+const std::string TRACE_RESERVED_KEY_HOST_NAME = "hostName";
 const std::string TRACE_RESERVED_KEY_START_TIME_NANO = "startTime";
 const std::string TRACE_RESERVED_KEY_END_TIME_NANO = "endTime";
+const std::string TRACE_RESERVED_KEY_DURATION = "duration";
+const std::string TRACE_RESERVED_KEY_ATTRIBUTES = "attributes";
+const std::string TRACE_RESERVED_KEY_RESOURCE = "resources";
+
+const std::string TRACE_RESERVED_KEY_LINKS = "links";
+const std::string TRACE_RESERVED_KEY_EVENTS = "events";
+const std::string TRACE_RESERVED_KEY_TIMESTAMP = "timestamp";
+
+const std::string TRACE_RESERVED_KEY_STATUS_CODE = "statusCode";
+const std::string TRACE_RESERVED_KEY_STATUS_MESSAGE = "statusMessage";
+
+const std::string TRACE_RESERVED_KEY_SPAN_KIND = "kind";
+const std::string TRACE_RESERVED_KEY_TRACE_STATE = "traceState";
+const std::string TRACE_RESERVED_KEY_IP = "ip";
+
+const std::string TRACE_RESERVED_KEY_APP_ID = "appId";
+
+#define SET_LOG_CONTENT(logPtr, key, value) \
+    logPtr = log->add_contents();             \
+    logPtr->set_key(key);                     \
+    logPtr->set_value(value);
+
 
 using namespace std;
 
@@ -131,28 +153,27 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         } else if (e.Is<SpanEvent>()) {
             const auto& spanEvent = e.Cast<SpanEvent>();
             auto log = logGroup.add_logs();
-
+            sls_logs::Log_Content* logPtr;
+            
             // set trace_id span_id span_kind status etc
-            auto logPtr = log->add_contents();
-            logPtr->set_key(TRACE_RESERVED_KEY_TRACE_ID);
-            logPtr->set_value(spanEvent.GetTraceId().to_string());
-            logPtr = log->add_contents();
-            logPtr->set_key(TRACE_RESERVED_KEY_SPAN_ID);
-            logPtr->set_value(spanEvent.GetSpanId().to_string());
-            logPtr = log->add_contents();
-            logPtr->set_key(TRACE_RESERVED_KEY_PARENT_ID);
-            logPtr->set_value(spanEvent.GetParentSpanId().to_string());
-            logPtr = log->add_contents();
-            logPtr->set_key(TRACE_RESERVED_KEY_SPAN_NAME);
-            logPtr->set_value(spanEvent.GetName().to_string());
-            logPtr = log->add_contents();
-            logPtr->set_key(TRACE_RESERVED_KEY_SPAN_KIND);
-            logPtr->set_value(spanEvent.GetKindString().to_string());
-            logPtr = log->add_contents();
-            logPtr->set_key(TRACE_RESERVED_KEY_SPAN_STATUS);
-            logPtr->set_value(spanEvent.GetStatusString().to_string());
+            SET_LOG_CONTENT(logPtr, TRACE_RESERVED_KEY_TRACE_ID, spanEvent.GetTraceId().to_string());
+            SET_LOG_CONTENT(logPtr, TRACE_RESERVED_KEY_SPAN_ID, spanEvent.GetSpanId().to_string());
 
-            // set start/end timestamp
+
+            // logPtr = log->add_contents();
+            // logPtr->set_key(TRACE_RESERVED_KEY_PARENT_ID);
+            // logPtr->set_value(spanEvent.GetParentSpanId().to_string());
+            // logPtr = log->add_contents();
+            // logPtr->set_key(TRACE_RESERVED_KEY_SPAN_NAME);
+            // logPtr->set_value(spanEvent.GetName().to_string());
+            // logPtr = log->add_contents();
+            // logPtr->set_key(TRACE_RESERVED_KEY_SPAN_KIND);
+            // logPtr->set_value(spanEvent.GetKindString().to_string());
+            // logPtr = log->add_contents();
+            // logPtr->set_key(TRACE_RESERVED_KEY_STATUS_CODE);
+            // logPtr->set_value(spanEvent.GetStatusString().to_string());
+
+            // set start/end timestamp and duration
             logPtr = log->add_contents();
             logPtr->set_key(TRACE_RESERVED_KEY_START_TIME_NANO);
             logPtr->set_value(std::to_string(spanEvent.GetStartTimeNs()));
@@ -160,36 +181,24 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             logPtr->set_key(TRACE_RESERVED_KEY_END_TIME_NANO);
             logPtr->set_value(std::to_string(spanEvent.GetEndTimeNs()));
             
-            // set tags
-            std::ostringstream oss;
+            // set tags and scope tags
+            Json::Value emptyJson;
             bool hasPrev = false;
             for (auto it = spanEvent.TagsBegin(); it != spanEvent.TagsEnd(); ++it) {
-                if (hasPrev) {
-                    oss << METRIC_LABELS_SEPARATOR;
-                }
-                hasPrev = true;
-                oss << it->first << METRIC_LABELS_KEY_VALUE_SEPARATOR << it->second;
+                emptyJson[it->first.to_string()] = it->second.to_string();
             }
-            logPtr = log->add_contents();
-            logPtr->set_key(TRACE_RESERVED_KEY_SPAN_TAGS);
-            logPtr->set_value(oss.str());
-
-            // set scope tags
             for (auto it = spanEvent.ScopeTagsBegin(); it != spanEvent.ScopeTagsEnd(); ++it) {
-                if (hasPrev) {
-                    oss << METRIC_LABELS_SEPARATOR;
-                }
-                hasPrev = true;
-                oss << it->first << METRIC_LABELS_KEY_VALUE_SEPARATOR << it->second;
+                emptyJson[it->first.to_string()] = it->second.to_string();
             }
             logPtr = log->add_contents();
-            logPtr->set_key(TRACE_RESERVED_KEY_SCOPE_TAGS);
-            logPtr->set_value(oss.str());
+            logPtr->set_key(TRACE_RESERVED_KEY_ATTRIBUTES);
+            logPtr->set_value(emptyJson.asString());
 
             // set time, no need to set nanosecond for metric
             log->set_time(spanEvent.GetTimestamp());
 
             // TODO set span events and span links
+            
         } else {
             errorMsg = "unsupported event type in event group";
             return false;
