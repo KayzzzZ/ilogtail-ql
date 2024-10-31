@@ -353,7 +353,7 @@ void eBPFServer::GenerateSpan(logtail::QueueKey key, uint32_t idx) {
             mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
             for (size_t j = 0 ; j < 25; j ++) {
                 auto spanEvent = mTestEventGroup.AddSpanEvent();
-                spanEvent->SetScopeTag();
+                // spanEvent->SetScopeTag();
                 spanEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
                 spanEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
                 spanEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
@@ -430,6 +430,8 @@ void eBPFServer::GenerateAgentInfo(logtail::QueueKey key, uint32_t idx) {
         const std::string ipKey = "ip";
         const std::string ip_prefix = "30.221.146.";
 
+        const std::string agentVersionKey = "agentVersion";
+
         for (int i = 0; i < 50; i ++) {
             std::string app = app_prefix + std::to_string(i);
             std::string ip = ip_prefix + std::to_string(i);
@@ -439,6 +441,7 @@ void eBPFServer::GenerateAgentInfo(logtail::QueueKey key, uint32_t idx) {
             logEvent->SetContent(agentIdKey, app);
             logEvent->SetContent(appNameKey, appNamePrefix + std::to_string(i));
             logEvent->SetContent(startTimestampKey, startTimestamp);
+            logEvent->SetContent(agentVersionKey, "0.0.1");
             // auto now = std::chrono::steady_clock::now();
             logEvent->SetTimestamp(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
         }
@@ -503,7 +506,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
             mMeterCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
             mLogMockThread = std::thread(&eBPFServer::GenerateAgentInfo, this, ctx->GetProcessQueueKey(), plugin_index);
             mMetricMockThread = std::thread(&eBPFServer::GenerateMetric, this, ctx->GetProcessQueueKey(), plugin_index);
-            mTraceMockThread = std::thread(&eBPFServer::GenerateSpan, this, ctx->GetProcessQueueKey(), plugin_index);
+            // mTraceMockThread = std::thread(&eBPFServer::GenerateSpan, this, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableSpan) {
             nconfig.enable_span_ = true;

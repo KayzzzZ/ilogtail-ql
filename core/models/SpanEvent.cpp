@@ -75,7 +75,24 @@ size_t SpanEvent::SpanLink::DataSize() const {
     return mTraceId.size() + mSpanId.size() + mTraceState.size() + mTags.DataSize();
 }
 
-#ifdef APSARA_UNIT_TEST_MAIN
+std::string SpanEvent::SpanLink::ToString() const {
+    Json::Value root;
+    root["traceId"] = mTraceId.to_string();
+    root["spanId"] = mSpanId.to_string();
+    if (!mTraceState.empty()) {
+        root["traceState"] = mTraceState.to_string();
+    }
+    if (!mTags.mInner.empty()) {
+        // TODO @qianlu.kk
+        // Json::Value& tags = root["tags"];
+        Json::Value& tags = root["attributes"];
+        for (const auto& tag : mTags.mInner) {
+            tags[tag.first.to_string()] = tag.second.to_string();
+        }
+    }
+    return root.asString();
+}
+
 Json::Value SpanEvent::SpanLink::ToJson() const {
     Json::Value root;
     root["traceId"] = mTraceId.to_string();
@@ -84,7 +101,9 @@ Json::Value SpanEvent::SpanLink::ToJson() const {
         root["traceState"] = mTraceState.to_string();
     }
     if (!mTags.mInner.empty()) {
-        Json::Value& tags = root["tags"];
+        // TODO @qianlu.kk fake
+        // Json::Value& tags = root["tags"];
+        Json::Value& tags = root["attributes"];
         for (const auto& tag : mTags.mInner) {
             tags[tag.first.to_string()] = tag.second.to_string();
         }
@@ -92,6 +111,7 @@ Json::Value SpanEvent::SpanLink::ToJson() const {
     return root;
 }
 
+#ifdef APSARA_UNIT_TEST_MAIN
 void SpanEvent::SpanLink::FromJson(const Json::Value& value) {
     SetTraceId(value["traceId"].asString());
     SetSpanId(value["spanId"].asString());
@@ -155,13 +175,29 @@ size_t SpanEvent::InnerEvent::DataSize() const {
     return sizeof(decltype(mTimestampNs)) + mName.size() + mTags.DataSize();
 }
 
-#ifdef APSARA_UNIT_TEST_MAIN
+std::string SpanEvent::InnerEvent::ToString() const {
+    Json::Value root;
+    root["name"] = mName.to_string();
+    root["timestampNs"] = static_cast<int64_t>(mTimestampNs);
+    if (!mTags.mInner.empty()) {
+        // TODO @qianlu.kk
+        // Json::Value& tags = root["tags"];
+        Json::Value& tags = root["attributes"];
+        for (const auto& tag : mTags.mInner) {
+            tags[tag.first.to_string()] = tag.second.to_string();
+        }
+    }
+    return root.asString();
+}
+
 Json::Value SpanEvent::InnerEvent::ToJson() const {
     Json::Value root;
     root["name"] = mName.to_string();
     root["timestampNs"] = static_cast<int64_t>(mTimestampNs);
     if (!mTags.mInner.empty()) {
-        Json::Value& tags = root["tags"];
+        // TODO @qianlu.kk
+        // Json::Value& tags = root["tags"];
+        Json::Value& tags = root["attributes"];
         for (const auto& tag : mTags.mInner) {
             tags[tag.first.to_string()] = tag.second.to_string();
         }
@@ -169,6 +205,7 @@ Json::Value SpanEvent::InnerEvent::ToJson() const {
     return root;
 }
 
+#ifdef APSARA_UNIT_TEST_MAIN
 void SpanEvent::InnerEvent::FromJson(const Json::Value& value) {
     SetName(value["name"].asString());
     SetTimestampNs(value["timestampNs"].asUInt64());
@@ -275,6 +312,32 @@ SpanEvent::SpanLink* SpanEvent::AddLink() {
     SpanEvent::SpanLink l(this);
     mLinks.emplace_back(std::move(l));
     return &mLinks.back();
+}
+
+std::string SpanEvent::SerializeLinksToString() const {
+    if (mLinks.empty()) {
+        return "";
+    }
+    Json::Value root;
+    Json::Value jsonLinks(Json::arrayValue);
+    for (auto& link : mLinks) {
+        jsonLinks.append(link.ToJson());
+    }
+    root["links"] = jsonLinks;
+    return root.asString();
+}
+
+std::string SpanEvent::SerializeEventsToString() const {
+    if (mEvents.empty()) {
+        return "";
+    }
+    Json::Value root;
+    Json::Value jsonLinks(Json::arrayValue);
+    for (auto& link : mEvents) {
+        jsonLinks.append(link.ToJson());
+    }
+    root["events"] = jsonLinks;
+    return root.asString();
 }
 
 StringView SpanEvent::GetScopeTag(StringView key) const {

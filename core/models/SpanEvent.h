@@ -19,6 +19,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <json/json.h>
 
 #include "common/memory/SourceBuffer.h"
 #include "models/PipelineEvent.h"
@@ -67,8 +68,10 @@ public:
 
         size_t DataSize() const;
 
-#ifdef APSARA_UNIT_TEST_MAIN
+        std::string ToString() const;
+
         Json::Value ToJson() const;
+#ifdef APSARA_UNIT_TEST_MAIN
         void FromJson(const Json::Value& value);
 #endif
 
@@ -107,8 +110,10 @@ public:
 
         size_t DataSize() const;
 
-#ifdef APSARA_UNIT_TEST_MAIN
+        std::string ToString() const;
+
         Json::Value ToJson() const;
+#ifdef APSARA_UNIT_TEST_MAIN
         void FromJson(const Json::Value& value);
 #endif
 
@@ -148,12 +153,12 @@ public:
     Kind GetKind() const { return mKind; }
     constexpr StringView GetKindString() const {
         switch (mKind) {
-        case Kind::Unspecified: return "Unspecified";
-        case Kind::Internal:   return "Internal";
-        case Kind::Server:     return "Server";
-        case Kind::Client:     return "Client";
-        case Kind::Producer:   return "Producer";
-        case Kind::Consumer:   return "Consumer";
+        case Kind::Unspecified: return "unspecified";
+        case Kind::Internal:   return "internal";
+        case Kind::Server:     return "server";
+        case Kind::Client:     return "client";
+        case Kind::Producer:   return "producer";
+        case Kind::Consumer:   return "consumer";
         default:               return "Unknown";
         }
     }
@@ -178,18 +183,20 @@ public:
 
     const std::vector<InnerEvent>& GetEvents() const { return mEvents; }
     InnerEvent* AddEvent();
+    std::string SerializeEventsToString() const;
 
     const std::vector<SpanLink>& GetLinks() const { return mLinks; }
     SpanLink* AddLink();
+    std::string SerializeLinksToString() const;
 
     StatusCode GetStatus() const { return mStatus; }
     void SetStatus(StatusCode status) { mStatus = status; }
     constexpr StringView GetStatusString() const {
         switch (mStatus) {
-        case StatusCode::Unset: return "unset";
-        case StatusCode::Ok:   return "ok";
-        case StatusCode::Error:     return "error";
-        default:               return "";
+        case StatusCode::Unset: return "UNSET";
+        case StatusCode::Ok:   return "OK";
+        case StatusCode::Error:     return "ERROR";
+        default:               return "UNSET";
         }
     }
 
