@@ -197,7 +197,9 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             for (auto it = spanEvent.ScopeTagsBegin(); it != spanEvent.ScopeTagsEnd(); ++it) {
                 emptyJson[it->first.to_string()] = it->second.to_string();
             }
-            SET_LOG_CONTENT(logPtr, TRACE_RESERVED_KEY_ATTRIBUTES, emptyJson.asString());
+            Json::StreamWriterBuilder writer;
+            std::string attrString = Json::writeString(writer, emptyJson);
+            SET_LOG_CONTENT(logPtr, TRACE_RESERVED_KEY_ATTRIBUTES, attrString);
 
             // set time, no need to set nanosecond for metric
             log->set_time(spanEvent.GetTimestamp());

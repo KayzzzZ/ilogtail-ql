@@ -324,7 +324,8 @@ std::string SpanEvent::SerializeLinksToString() const {
         jsonLinks.append(link.ToJson());
     }
     root["links"] = jsonLinks;
-    return root.asString();
+    Json::StreamWriterBuilder writer;
+    return Json::writeString(writer, root);
 }
 
 std::string SpanEvent::SerializeEventsToString() const {
@@ -337,7 +338,8 @@ std::string SpanEvent::SerializeEventsToString() const {
         jsonLinks.append(link.ToJson());
     }
     root["events"] = jsonLinks;
-    return root.asString();
+    Json::StreamWriterBuilder writer;
+    return Json::writeString(writer, root);
 }
 
 StringView SpanEvent::GetScopeTag(StringView key) const {
