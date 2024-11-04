@@ -120,6 +120,7 @@ namespace sdk {
          */
         PostLogStoreLogsResponse PostLogStoreLogPackageList(const std::string& project,
                                                             const std::string& logstore,
+                                                            const std::string& subpath,
                                                             sls_logs::SlsCompressType compressType,
                                                             const std::string& packageListData,
                                                             const std::string& hashKey = "");
@@ -133,6 +134,7 @@ namespace sdk {
          */
         std::unique_ptr<HttpSinkRequest> CreatePostLogStoreLogsRequest(const std::string& project,
                                                                        const std::string& logstore,
+                                                                       const std::string& subpath,
                                                                        sls_logs::SlsCompressType compressType,
                                                                        const std::string& compressedLogGroup,
                                                                        uint32_t rawSize,
@@ -155,7 +157,7 @@ namespace sdk {
                                                                           uint32_t rawSize,
                                                                           SenderQueueItem* item) {
             return CreatePostLogStoreLogsRequest(
-                project, logstore, compressType, compressedLogGroup, rawSize, item, "", kInvalidHashKeySeqID, true);
+                project, logstore, "", compressType, compressedLogGroup, rawSize, item, "", kInvalidHashKeySeqID, true);
         }
 
 
@@ -167,6 +169,7 @@ namespace sdk {
          */
         std::unique_ptr<HttpSinkRequest> CreatePostLogStoreLogPackageListRequest(const std::string& project,
                                                                                  const std::string& logstore,
+                                                                                 const std::string& subpath,
                                                                                  sls_logs::SlsCompressType compressType,
                                                                                  const std::string& packageListData,
                                                                                  SenderQueueItem* item,
@@ -196,6 +199,7 @@ namespace sdk {
         std::unique_ptr<HttpSinkRequest>
         CreateAsynPostLogStoreLogsRequest(const std::string& project,
                                           const std::string& logstore,
+                                          const std::string& subpath,
                                           const std::string& body,
                                           std::map<std::string, std::string>& httpHeader,
                                           const std::string& hashKey,
@@ -215,6 +219,7 @@ namespace sdk {
 
         PostLogStoreLogsResponse SynPostLogStoreLogs(const std::string& project,
                                                      const std::string& logstore,
+                                                     const std::string& subpath,
                                                      const std::string& body,
                                                      std::map<std::string, std::string>& httpHeader,
                                                      const std::string& hashKey,

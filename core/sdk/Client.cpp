@@ -238,6 +238,7 @@ namespace sdk {
 
     PostLogStoreLogsResponse Client::PostLogStoreLogPackageList(const std::string& project,
                                                                 const std::string& logstore,
+                                                                const std::string& subpath,
                                                                 sls_logs::SlsCompressType compressType,
                                                                 const std::string& packageListData,
                                                                 const std::string& hashKey) {
@@ -249,11 +250,12 @@ namespace sdk {
         httpHeader[X_LOG_MODE] = LOG_MODE_BATCH_GROUP;
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(packageListData.size());
         httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
-        return SynPostLogStoreLogs(project, logstore, packageListData, httpHeader, hashKey);
+        return SynPostLogStoreLogs(project, logstore, subpath, packageListData, httpHeader, hashKey);
     }
 
     unique_ptr<HttpSinkRequest> Client::CreatePostLogStoreLogsRequest(const std::string& project,
                                                                       const std::string& logstore,
+                                                                      const std::string& subpath,
                                                                       sls_logs::SlsCompressType compressType,
                                                                       const std::string& compressedLogGroup,
                                                                       uint32_t rawSize,
@@ -273,13 +275,14 @@ namespace sdk {
                 project, logstore, compressedLogGroup, httpHeader,item);
         } else {
             return CreateAsynPostLogStoreLogsRequest(
-                project, logstore, compressedLogGroup, httpHeader, hashKey, hashKeySeqID, item);
+                project, logstore, subpath, compressedLogGroup, httpHeader, hashKey, hashKeySeqID, item);
         }
     }
 
 
     unique_ptr<HttpSinkRequest> Client::CreatePostLogStoreLogPackageListRequest(const std::string& project,
                                                                                 const std::string& logstore,
+                                                                                const std::string& subpath,
                                                                                 sls_logs::SlsCompressType compressType,
                                                                                 const std::string& packageListData,
                                                                                 SenderQueueItem* item,
@@ -293,7 +296,7 @@ namespace sdk {
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(packageListData.size());
         httpHeader[X_LOG_COMPRESSTYPE] = Client::GetCompressTypeString(compressType);
         return CreateAsynPostLogStoreLogsRequest(
-            project, logstore, packageListData, httpHeader, hashKey, kInvalidHashKeySeqID, item);
+            project, logstore, subpath, packageListData, httpHeader, hashKey, kInvalidHashKeySeqID, item);
     }
 
     void Client::SendRequest(const std::string& project,
@@ -346,17 +349,23 @@ namespace sdk {
     unique_ptr<HttpSinkRequest>
     Client::CreateAsynPostLogStoreLogsRequest(const std::string& project,
                                               const std::string& logstore,
+                                              const std::string& subpath,
                                               const std::string& body,
                                               std::map<std::string, std::string>& httpHeader,
                                               const std::string& hashKey,
                                               int64_t hashKeySeqID,
                                               SenderQueueItem* item) {
         string operation = LOGSTORES;
-        operation.append("/").append(logstore);
-        if (hashKey.empty())
-            operation.append("/shards/lb");
-        else
-            operation.append("/shards/route");
+        if (subpath.size()) {
+            operation = subpath;
+        } else {
+            operation.append("/").append(logstore);
+            if (hashKey.empty())
+                operation.append("/shards/lb");
+            else
+                operation.append("/shards/route");
+        }
+        
 
         httpHeader[CONTENT_MD5] = CalcMD5(body);
 
@@ -392,21 +401,26 @@ namespace sdk {
             httpHeader[X_LOG_KEYPROVIDER] = mKeyProvider;
         }
         httpHeader[X_LOG_BODYRAWSIZE] = std::to_string(serializeData.size());
-        return SynPostLogStoreLogs(project, logstore, serializeData, httpHeader, "", realIpPtr);
+        return SynPostLogStoreLogs(project, logstore, "", serializeData, httpHeader, "", realIpPtr);
     }
 
     PostLogStoreLogsResponse Client::SynPostLogStoreLogs(const std::string& project,
                                                          const std::string& logstore,
+                                                         const std::string& subpath,
                                                          const std::string& body,
                                                          std::map<std::string, std::string>& httpHeader,
                                                          const std::string& hashKey,
                                                          std::string* realIpPtr) {
         string operation = LOGSTORES;
-        operation.append("/").append(logstore);
-        if (hashKey.empty())
-            operation.append("/shards/lb");
-        else
-            operation.append("/shards/route");
+        if (subpath.size()) {
+            operation = subpath;
+        } else {
+            operation.append("/").append(logstore);
+            if (hashKey.empty())
+                operation.append("/shards/lb");
+            else
+                operation.append("/shards/route");
+        }
 
         httpHeader[CONTENT_MD5] = CalcMD5(body);
 

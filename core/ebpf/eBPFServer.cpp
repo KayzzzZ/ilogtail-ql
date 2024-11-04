@@ -246,6 +246,7 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
             mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.55");
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
             for (size_t j = 0 ; j < app_metric_names.size(); j ++) {
                 for (size_t z = 0; z < 10; z ++ ) {
                     auto metricsEvent = mTestEventGroup.AddMetricEvent();
@@ -275,6 +276,7 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
             mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.44");
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
             for (size_t j = 0 ; j < tcp_metrics_names.size(); j ++) {
                 for (size_t z = 0; z < 20; z ++ ) {
                     auto metricsEvent = mTestEventGroup.AddMetricEvent();
@@ -351,6 +353,7 @@ void eBPFServer::GenerateSpan(logtail::QueueKey key, uint32_t idx) {
             mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.55");
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            mTestEventGroup.SetTag(std::string("data_type"), std::string("trace"));
             for (size_t j = 0 ; j < 25; j ++) {
                 auto spanEvent = mTestEventGroup.AddSpanEvent();
                 // spanEvent->SetScopeTag();
@@ -418,6 +421,7 @@ void eBPFServer::GenerateAgentInfo(logtail::QueueKey key, uint32_t idx) {
     while(mGenerateFlag) {
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
+        eventGroup.SetTag(std::string("data_type"), std::string("agent_info"));
         const std::string app_id_key = "appId";
         const std::string agentIdKey = "agentId";
         const std::string app_prefix = "app-";

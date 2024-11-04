@@ -764,12 +764,13 @@ SendResult DiskBufferWriter::SendToNetSync(sdk::Client* sendClient,
                 if (bufferMeta.has_shardhashkey() && !bufferMeta.shardhashkey().empty())
                     sendClient->PostLogStoreLogPackageList(bufferMeta.project(),
                                                            bufferMeta.logstore(),
+                                                           "",
                                                            bufferMeta.compresstype(),
                                                            logData,
                                                            bufferMeta.shardhashkey());
                 else
                     sendClient->PostLogStoreLogPackageList(
-                        bufferMeta.project(), bufferMeta.logstore(), bufferMeta.compresstype(), logData);
+                        bufferMeta.project(), bufferMeta.logstore(), "", bufferMeta.compresstype(), logData);
             }
             return SEND_OK;
         } catch (sdk::LOGException& ex) {

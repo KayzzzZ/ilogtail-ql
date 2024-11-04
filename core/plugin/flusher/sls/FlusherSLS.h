@@ -78,6 +78,7 @@ public:
     std::string mRegion;
     std::string mEndpoint;
     std::string mAliuid;
+    std::string mSubpath;
     sls_logs::SlsTelemetryType mTelemetryType = sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS;
     std::vector<std::string> mShardHashKeys;
     uint32_t mMaxSendRate = 0; // preserved only for exactly once
