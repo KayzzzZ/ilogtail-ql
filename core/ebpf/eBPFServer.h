@@ -83,6 +83,9 @@ public:
     bool IsSupportedEnv(nami::PluginType type);
 
     std::string GetAllProjects();
+    void GenerateMetric(logtail::QueueKey key, uint32_t idx);
+    void GenerateSpan(logtail::QueueKey key, uint32_t idx);
+    void GenerateAgentInfo(logtail::QueueKey key, uint32_t idx);
 
 private:
     bool StartPluginInternal(const std::string& pipeline_name, uint32_t plugin_index,
@@ -109,6 +112,11 @@ private:
 
     eBPFAdminConfig mAdminConfig;
     volatile bool mInited = false;
+
+    std::atomic_bool mGenerateFlag = false;
+    std::thread mMetricMockThread;
+    std::thread mLogMockThread;
+    std::thread mTraceMockThread;
 
     EnvManager mEnvMgr;
     std::unique_ptr<eBPFSelfMonitorMgr> mMonitorMgr;

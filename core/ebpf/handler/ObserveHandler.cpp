@@ -15,7 +15,10 @@
 #include <thread>
 #include <mutex>
 #include <iostream>
+#include <metadata/K8sMetadata.h>
+#include <unordered_set>
 
+#include "common/Lock.h"
 #include "ebpf/handler/ObserveHandler.h"
 #include "pipeline/PipelineContext.h"
 #include "common/RuntimeUtil.h"
@@ -146,6 +149,106 @@ void EventHandler::handle(std::vector<std::unique_ptr<ApplicationBatchEvent>>&& 
             LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Event] push queue failed!", ""));
         }
     }
+}
+HostMetadataHandler::HostMetadataHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx, int intervalSec) 
+    : mCtx(ctx), mQueueKey(key), mPluginIdx(idx) ,mIntervalSec(intervalSec) {
+    mFlag = true;
+    mReporter = std::thread(&HostMetadataHandler::ReportAgentInfo, this);
+}
+
+HostMetadataHandler::~HostMetadataHandler() {
+    mFlag = false;
+    if (mReporter.joinable()) {
+        mReporter.join();
+    }
+}
+
+const std::string pidKey = "pid";
+const std::string appNameKey = "appName";
+const std::string ipKey = "ip";
+const std::string hostNameKey = "hostname";
+const std::string agentVersionKey = "agentVersion";
+const std::string startTimestampKey = "startTimeStamp";
+const std::string dataTypeKey = "data_type";
+const std::string agentInfoStr = "agent_info";
+
+
+void HostMetadataHandler::ReportAgentInfo() {
+    while(mFlag) {
+        std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+        eventGroup.SetTag(dataTypeKey, agentInfoStr);
+        auto nowSec = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        {
+            ReadLock lk(mLock);
+            for (const auto& [ip, spi] : mHostPods) {
+                auto logEvent = eventGroup.AddLogEvent();
+                logEvent->SetContent(pidKey, spi->mAppId);
+                logEvent->SetContent(appNameKey, spi->mAppName);
+                logEvent->SetContent(ipKey, spi->mPodIp);
+                logEvent->SetContent(hostNameKey, spi->mPodName);
+                logEvent->SetContent(agentVersionKey, "1.0.0");
+                logEvent->SetContent(startTimestampKey, std::to_string(spi->mStartTime));
+                logEvent->SetTimestamp(nowSec);
+            }
+        }
+
+        // TODO @qianlu.kk need to add lock to protect pipeline udpate ... 
+        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+        auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
+        if (res) {
+            LOG_WARNING(sLogger, ("[AgentInfo] push queue failed! status", res));
+        } else {
+            LOG_DEBUG(sLogger, ("[AgentInfo] push queue success!", ""));
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(mIntervalSec));
+    }
+}
+
+bool HostMetadataHandler::handle(std::vector<std::string>& podIpVec) {
+    std::vector<std::string> newContainerIds;
+    std::vector<std::string> expiredContainerIds;
+    std::unordered_set<std::string> newPodIps;
+
+    std::unordered_map<std::string, std::unique_ptr<SimplePodInfo>> newHostPods;
+
+    for (const auto& ip : podIpVec) {
+        auto podInfo = K8sMetadata::GetInstance().GetInfoByIpFromCache(ip);
+        std::unique_ptr<SimplePodInfo> spi = std::make_unique<SimplePodInfo>(
+            uint64_t(podInfo->timestamp), 
+            podInfo->appId,
+            podInfo->appName,
+            podInfo->podIp, 
+            podInfo->podName,
+            podInfo->containerIds);
+        newHostPods[ip] = std::move(spi);
+    }
+    
+    std::vector<std::string> addedPods;
+    std::vector<std::string> removedPods;
+    {
+        ReadLock lk(mLock);
+        for (const auto& [ip, _] : newHostPods) {
+            if (mHostPods.find(ip) == mHostPods.end()) {
+                addedPods.push_back(ip);
+            }
+        }
+
+        for (const auto& [ip, _] : mHostPods) {
+            if (newHostPods.find(ip) == newHostPods.end()) {
+                removedPods.push_back(ip);
+            }
+        }
+    }
+
+    {
+        WriteLock lk(mLock);
+        // update cache ... 
+        mHostPods = std::move(newHostPods);
+    }
+    // TODO @qianlu.kk to be deleted —— remove from whitelist
+
+    return true;
 }
 
 #ifdef __ENTERPRISE__

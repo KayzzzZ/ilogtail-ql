@@ -337,6 +337,16 @@ namespace sdk {
         }
         mClient->Send(
             httpMethod, host, port, url, queryString, header, body, mTimeout, httpMessage, mInterface, mUsingHTTPS);
+        LOG_INFO(sLogger, 
+            ("url", url)
+            ("host", host)
+            ("mUsingHTTPS", mUsingHTTPS)
+            ("Authorization", header[AUTHORIZATION])
+            ("X_LOG_MODE", header[X_LOG_MODE])
+            ("X_LOG_COMPRESSTYPE", header[X_LOG_COMPRESSTYPE]) 
+            ("X_LOG_BODYRAWSIZE", header[X_LOG_BODYRAWSIZE])
+            ("statusCode", httpMessage.statusCode)
+            ("content", httpMessage.content));
 
         if (httpMessage.statusCode != 200) {
             if (realIpPtr != NULL) {
@@ -494,11 +504,14 @@ namespace sdk {
                                                         const std::string& body,
                                                         std::map<std::string, std::string>& httpHeader,
                                                         std::string* realIpPtr) {
+        LOG_INFO(sLogger, ("entering, subpath", subpath) ("project", project));
         string operation = subpath;
         httpHeader[CONTENT_MD5] = CalcMD5(body);
         map<string, string> parameterList;
         HttpMessage httpResponse;
+        LOG_INFO(sLogger, ("before, operation", operation) );
         SendRequest(project, HTTP_POST, operation, body, parameterList, httpHeader, httpResponse, realIpPtr);
+        LOG_INFO(sLogger, ("after, operation", operation) ("statusCode", httpResponse.statusCode) ("content", httpResponse.content));
         PostLogStoreLogsResponse ret;
         ret.bodyBytes = (int32_t)body.size();
         ret.statusCode = httpResponse.statusCode;

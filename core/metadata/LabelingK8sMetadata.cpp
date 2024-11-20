@@ -44,10 +44,10 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
         }
     }
     auto& k8sMetadata = K8sMetadata::GetInstance();
-    if (containerVec.empty() || (!k8sMetadata.GetByContainerIdsFromServer(containerVec))) {
+    if (containerVec.empty() || (k8sMetadata.GetByContainerIdsFromServer(containerVec).size() != containerVec.size())) {
         return;
     }
-    if (remoteIpVec.empty() || (!k8sMetadata.GetByIpsFromServer(remoteIpVec))) {
+    if (remoteIpVec.empty() || (k8sMetadata.GetByIpsFromServer(remoteIpVec).size() != remoteIpVec.size())) {
         return;
     }
     for (size_t i = 0; i < cotainerNotTag.size(); ++i) {

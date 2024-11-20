@@ -15,6 +15,9 @@
 #pragma once
 
 #include <vector>
+#include <unordered_map>
+#include <set>
+
 
 #include "ebpf/handler/AbstractHandler.h"
 #include "ebpf/include/export.h"
@@ -51,6 +54,43 @@ class EventHandler : public AbstractHandler {
 public:
     EventHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : AbstractHandler(ctx, key, idx) {}
     void handle(std::vector<std::unique_ptr<ApplicationBatchEvent>>&&);
+};
+
+class SimplePodInfo {
+public:
+    SimplePodInfo(uint64_t startTime, 
+        const std::string& appId, 
+        const std::string& appName, 
+        const std::string& podIp, 
+        const std::string& podName, 
+        std::vector<std::string>& cids) : mStartTime(startTime), mAppId(appId), mAppName(appName), mPodIp(podIp), mPodName(podName) {}
+    
+    uint64_t mStartTime;
+    std::string mAppId;
+    std::string mAppName;
+    std::string mPodIp;
+    std::string mPodName;
+    std::vector<std::string> mContainerIds;
+};
+
+class HostMetadataHandler {
+public:
+    HostMetadataHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx, int intervalSec = 60);
+    ~HostMetadataHandler();
+    bool handle(std::vector<std::string>& podIpVec);
+    void ReportAgentInfo();
+private:
+    // key is podIp, value is cids
+    std::unordered_map<std::string, std::unique_ptr<SimplePodInfo>> mHostPods;
+    std::thread mReporter;
+    std::atomic_bool mFlag;
+    ReadWriteLock mLock;
+
+    const logtail::PipelineContext* mCtx = nullptr;
+    logtail::QueueKey mQueueKey = 0;
+    uint64_t mProcessTotalCnt = 0;
+    uint32_t mPluginIdx = 0;
+    int mIntervalSec;
 };
 
 #ifdef __ENTERPRISE__

@@ -65,9 +65,15 @@ enum SpanCacheIdx {
 };
 
 bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, string& errorMsg) {
+    if (group.mTags.mInner.count("data_type") && group.mTags.mInner["data_type"] == "agent_info") {
+        LOG_INFO(sLogger, ("agent_info group", "Serialize enter"));
+    }
     if (group.mEvents.empty()) {
         errorMsg = "empty event group";
         return false;
+    }
+    if (group.mTags.mInner.count("data_type") && group.mTags.mInner["data_type"] == "agent_info") {
+        LOG_INFO(sLogger, ("agent_info group", "after check events size"));
     }
 
     PipelineEvent::Type eventType = group.mEvents[0]->GetType();
@@ -212,6 +218,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
             for (size_t i = 0; i < group.mEvents.size(); ++i) {
                 const auto& metricEvent = group.mEvents[i].Cast<MetricEvent>();
                 if (metricEvent.Is<std::monostate>()) {
+                    LOG_WARNING(sLogger, ("monostate", "skip") ("metric name", metricEvent.GetName()));
                     continue;
                 }
                 serializer.StartToAddLog(logSZ[i]);
@@ -220,6 +227,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                 serializer.AddLogContentMetricTimeNano(metricEvent);
                 serializer.AddLogContent(METRIC_RESERVED_KEY_VALUE, metricEventContentCache[i].first);
                 serializer.AddLogContent(METRIC_RESERVED_KEY_NAME, metricEvent.GetName());
+                LOG_INFO(sLogger, ("metric name", metricEvent.GetName()) ("serialize done", ""));
             }
             break;
         case PipelineEvent::Type::SPAN:
@@ -278,6 +286,13 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         }
     }
     res = std::move(serializer.GetResult());
+    if (group.mTags.mInner.count("data_type") && group.mTags.mInner["data_type"] == "agent_info") {
+        LOG_INFO(sLogger, ("arms agent_info group", "done"));
+    } else if (group.mTags.mInner.count("data_type") && group.mTags.mInner["data_type"] == "metric") {
+        LOG_INFO(sLogger, ("arms metric group", "done"));
+    } else if (group.mTags.mInner.count("data_type") && group.mTags.mInner["data_type"] == "trace") {
+        LOG_INFO(sLogger, ("arms trace group", "done"));
+    }
     return true;
 }
 
