@@ -102,6 +102,7 @@ private:
     std::unique_ptr<EventHandler> mEventCB;
     std::unique_ptr<MeterHandler> mMeterCB;
     std::unique_ptr<SpanHandler> mSpanCB;
+    std::unique_ptr<HostMetadataHandler> mHostMetadataCB;
     std::unique_ptr<SecurityHandler> mNetworkSecureCB;
     std::unique_ptr<SecurityHandler> mProcessSecureCB;
     std::unique_ptr<SecurityHandler> mFileSecureCB;

@@ -77,7 +77,7 @@ bool K8sMetadata::FromInfoJson(const Json::Value& json, k8sContainerInfo& info) 
     info.startTime = json[startTimeKey].asInt64();
     
 
-    // info.timestamp = std::time(0);
+    info.timestamp = std::time(0);
     return true;
 }
 
@@ -112,9 +112,14 @@ bool K8sMetadata::FromContainerJson(const Json::Value& json, std::shared_ptr<Con
 }
 
 // TODO @qianlu.kk how to remove callbacks...
-void K8sMetadata::ResiterHostMetadataCallback(HostMetadataPostHandler&& handler) {
+void K8sMetadata::ResiterHostMetadataCallback(uint32_t plugin_index, HostMetadataPostHandler&& handler) {
     std::lock_guard lk(mMtx);
-    mHostMetaCallback.push_back(std::move(handler));
+    mHostMetaCallback[plugin_index] = std::move(handler);
+}
+
+void K8sMetadata::DeregisterHostMetadataCallback(uint32_t plugin_index) {
+    std::lock_guard lk(mMtx);
+    mHostMetaCallback.erase(plugin_index);
 }
 
 void K8sMetadata::LocalHostMetaRefresher() {
@@ -128,10 +133,9 @@ void K8sMetadata::LocalHostMetaRefresher() {
         // do callbacks
         {
             std::lock_guard lk(mMtx);
-            for (size_t i = 0 ; i < mHostMetaCallback.size(); i ++ ) {
-                
-                bool res = mHostMetaCallback[i](podIpVec);
-                LOG_DEBUG(sLogger, ("cb status", res) ("cb index", i));
+            for (auto& it : mHostMetaCallback) {
+                bool res = it.second(it.first, podIpVec);
+                LOG_DEBUG(sLogger, ("host metadata callback status", res) ("plugin index", it.first));
             }
         }
         std::this_thread::sleep_for(std::chrono::seconds(mFetchIntervalSeconds));
@@ -202,7 +206,7 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
     }
 }
 
-std::vector<std::string> K8sMetadata::GetByContainerIdsFromServer(std::vector<std::string> containerIds) {
+std::vector<std::string> K8sMetadata::GetByContainerIdsFromServer(std::vector<std::string> containerIds, bool& status) {
     Json::Value jsonObj;
     for (auto& str : containerIds) {
         jsonObj["keys"].append(str);
@@ -251,7 +255,7 @@ void K8sMetadata::SetIpCache(const Json::Value& root) {
     }
 }
 
-std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string> ips) {
+std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string> ips, bool& status) {
     Json::Value jsonObj;
     for (auto& str : ips) {
         jsonObj["keys"].append(str);
@@ -282,6 +286,44 @@ std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByIpFromCache(const std::s
         return nullptr;
     }
     return ip_info;
+}
+
+std::vector<std::shared_ptr<k8sContainerInfo>> K8sMetadata::BlockingGetPodMetadataByContainerIds(std::vector<std::string>&& cids, bool& res) {
+    std::vector<std::shared_ptr<k8sContainerInfo>> ret(cids.size(), nullptr);
+    std::vector<std::string> cidVec;
+    for (size_t i = 0; i < cids.size(); i ++) {
+        auto& cid = cids[i];
+        auto res = GetInfoByContainerIdFromCache(cid);
+        if (res) ret[i] = res;
+        else cidVec.push_back(cid);
+    }
+    // get from server
+    if (cidVec.size()) {
+        GetByIpsFromServer(cidVec, res);
+    }
+
+}
+
+std::vector<std::shared_ptr<k8sContainerInfo>> K8sMetadata::BlockingGetPodMetadataByIps(std::vector<std::string>&& ips, bool& res) {
+    std::vector<std::shared_ptr<k8sContainerInfo>> ret(ips.size(), nullptr);
+    std::vector<std::string> ipVec;
+    for (size_t i = 0; i < ips.size(); i ++) {
+        auto& ip = ips[i];
+        auto res = GetInfoByIpFromCache(ip);
+        if (res) ret[i] = res;
+        else ipVec.push_back(ip);
+    }
+
+    // get from server
+    if (ipVec.size()) {
+        GetByIpsFromServer(ipVec, res);
+    }
+
+    // merge 
+    if (res) {
+        
+    }
+    
 }
 
 } // namespace logtail

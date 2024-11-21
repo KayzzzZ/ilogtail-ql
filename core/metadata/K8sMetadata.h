@@ -26,8 +26,8 @@ DECLARE_FLAG_INT32(loong_collector_singleton_port);
 
 namespace logtail {
 
-const static std::string appIdKey = "armsAppId";
-const static std::string appNameKey = "armsAppName";
+const static std::string appIdKey = "armseBPFAppId";
+const static std::string appNameKey = "armseBPFCreateAppName";
 const static std::string imageKey = "images";
 const static std::string labelsKey = "labels";
 const static std::string namespaceKey = "namespace";
@@ -53,7 +53,6 @@ struct k8sContainerInfo {
     std::string appName;
     std::string podIp;
     std::string podName;
-    std::string serviceName;
     int64_t startTime;
     std::vector<std::string> containerIds;
 };
@@ -69,7 +68,7 @@ enum class containerInfoType {
     HostInfo,
 };
 
-using HostMetadataPostHandler = std::function<bool(std::vector<std::string>&)>;
+using HostMetadataPostHandler = std::function<bool(uint32_t pluginIndex, std::vector<std::string>& containerIds)>;
 
 class K8sMetadata {
 private:
@@ -84,7 +83,7 @@ private:
     std::atomic_bool mFlag;
     int32_t mFetchIntervalSeconds;
     std::mutex mMtx;
-    std::vector<HostMetadataPostHandler> mHostMetaCallback;
+    std::map<uint32_t, HostMetadataPostHandler> mHostMetaCallback;
 
     K8sMetadata(size_t cacheSize, int32_t fetchIntervalSec = 5);
     K8sMetadata(const K8sMetadata&) = delete;
@@ -109,19 +108,27 @@ public:
         }
     }
 
-    void ResiterHostMetadataCallback(HostMetadataPostHandler&& callback);
+    void ResiterHostMetadataCallback(uint32_t plugin_index, HostMetadataPostHandler&& callback);
+    void DeregisterHostMetadataCallback(uint32_t plugin_index);
     // 公共方法
     // if cache not have,get from server
-    std::vector<std::string> GetByContainerIdsFromServer(std::vector<std::string> containerIds);
+    std::vector<std::string> GetByContainerIdsFromServer(std::vector<std::string> containerIds, bool& status);
     // get pod metadatas for local host 
     void GetByLocalHostFromServer();
     // 
-    std::vector<std::string> GetByIpsFromServer(std::vector<std::string> ips);
+    std::vector<std::string> GetByIpsFromServer(std::vector<std::string> ips, bool& status);
     // get info by container id from cache
     std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const std::string& containerId);
     // get info by ip from cache
     std::shared_ptr<k8sContainerInfo> GetInfoByIpFromCache(const std::string& ip);
     bool SendRequestToOperator(const std::string& urlHost, const std::string& output, containerInfoType infoType, std::vector<std::string>& resKey);
+
+    // BlockingGetPodMetadataByContainerIds
+    // if container info is not present in local cache, we will fetch it from remote server
+    std::vector<std::shared_ptr<k8sContainerInfo>> BlockingGetPodMetadataByContainerIds(std::vector<std::string>&&, bool& res);
+    // BlockingGetPodMetadataByIps 
+    // if container info is not present in local cache, we will fetch it from remote server
+    std::vector<std::shared_ptr<k8sContainerInfo>> BlockingGetPodMetadataByIps(std::vector<std::string>&&, bool& res);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class k8sMetadataUnittest;

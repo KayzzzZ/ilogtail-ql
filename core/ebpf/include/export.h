@@ -233,6 +233,26 @@ struct SecurityOption {
   }
 };
 
+class PodMeta {
+public:
+  PodMeta(const std::string& app_id, const std::string& app_name, 
+    const std::string& ns, 
+    const std::string& workload_name, 
+    const std::string& workload_kind, 
+    const std::string& pod_name, const std::string& pod_ip, const std::string& service_name) 
+    : app_id_(app_id), app_name_(app_name), namespace_(ns), workload_name_(workload_name), workload_kind_(workload_kind), pod_name_(pod_name), pod_ip_(pod_ip), service_name_(service_name){}
+  std::string app_id_;
+  std::string app_name_;
+  std::string namespace_;
+  std::string workload_name_;
+  std::string workload_kind_;
+  std::string pod_name_;
+  std::string pod_ip_;
+  std::string service_name_;
+};
+
+using K8sMetadataCallback = std::function<bool(std::vector<std::string>&&, std::vector<std::unique_ptr<PodMeta>>&)>;
+
 struct NetworkObserveConfig {
   bool enable_libbpf_debug_ = false;
   bool enable_so_ = false;
@@ -250,6 +270,9 @@ struct NetworkObserveConfig {
   NamiHandleBatchMeasureFunc measure_cb_ = nullptr;
   NamiHandleBatchSpanFunc span_cb_ = nullptr;
   NamiHandleBatchEventFunc event_cb_ = nullptr;
+  K8sMetadataCallback metadata_by_cid_cb_ = nullptr;
+  K8sMetadataCallback metadata_by_ip_cb_ = nullptr;
+
   bool operator==(const NetworkObserveConfig& other) const {
     return enable_libbpf_debug_ == other.enable_libbpf_debug_ &&
            enable_so_ == other.enable_so_ &&

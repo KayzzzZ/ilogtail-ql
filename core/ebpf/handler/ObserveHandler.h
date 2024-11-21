@@ -73,11 +73,11 @@ public:
     std::vector<std::string> mContainerIds;
 };
 
-class HostMetadataHandler {
+class HostMetadataHandler : public AbstractHandler {
 public:
     HostMetadataHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx, int intervalSec = 60);
     ~HostMetadataHandler();
-    bool handle(std::vector<std::string>& podIpVec);
+    bool handle(uint32_t pluginIndex, std::vector<std::string>& podIpVec);
     void ReportAgentInfo();
 private:
     // key is podIp, value is cids
@@ -85,11 +85,6 @@ private:
     std::thread mReporter;
     std::atomic_bool mFlag;
     ReadWriteLock mLock;
-
-    const logtail::PipelineContext* mCtx = nullptr;
-    logtail::QueueKey mQueueKey = 0;
-    uint64_t mProcessTotalCnt = 0;
-    uint32_t mPluginIdx = 0;
     int mIntervalSec;
 };
 

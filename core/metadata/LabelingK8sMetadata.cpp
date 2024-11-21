@@ -43,11 +43,13 @@ void LabelingK8sMetadata::AddLabelToLogGroup(PipelineEventGroup& logGroup) {
             cotainerNotTag.push_back(rIdx);
         }
     }
+    bool remoteStatus;
     auto& k8sMetadata = K8sMetadata::GetInstance();
-    if (containerVec.empty() || (k8sMetadata.GetByContainerIdsFromServer(containerVec).size() != containerVec.size())) {
+    if (containerVec.empty() || (k8sMetadata.GetByContainerIdsFromServer(containerVec, remoteStatus).size() != containerVec.size())) {
         return;
     }
-    if (remoteIpVec.empty() || (k8sMetadata.GetByIpsFromServer(remoteIpVec).size() != remoteIpVec.size())) {
+
+    if (remoteIpVec.empty() || (k8sMetadata.GetByIpsFromServer(remoteIpVec, remoteStatus).size() != remoteIpVec.size())) {
         return;
     }
     for (size_t i = 0; i < cotainerNotTag.size(); ++i) {
@@ -75,7 +77,7 @@ bool LabelingK8sMetadata::AddLabels(Event& e, std::vector<std::string>& containe
     bool res = true;
     
     auto& k8sMetadata = K8sMetadata::GetInstance();
-    StringView containerIdViewKey(containerIdKey);
+    StringView containerIdViewKey(containerIdKeyFromTags);
     StringView containerIdView = e.HasTag(containerIdViewKey) ? e.GetTag(containerIdViewKey) : StringView{};
     if (!containerIdView.empty()) {
         std::string containerId(containerIdView);

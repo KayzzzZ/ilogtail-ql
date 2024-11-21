@@ -111,9 +111,15 @@ void OtelSpanHandler::handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&
 #ifdef APSARA_UNIT_TEST_MAIN
         continue;
 #endif
-        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Span] push queue failed!", ""));
+        {
+            ReadLock lk(mCtxLock);
+            if (!mCtx) {
+                continue;
+            }
+            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Span] push queue failed!", ""));
+            }
         }
         
     }
@@ -144,15 +150,22 @@ void EventHandler::handle(std::vector<std::unique_ptr<ApplicationBatchEvent>>&& 
 #ifdef APSARA_UNIT_TEST_MAIN
         continue;
 #endif
-        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-            LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Event] push queue failed!", ""));
+        {
+            ReadLock lk(mCtxLock);
+            if (!mCtx) {
+                continue;
+            }
+            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            if (ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+                LOG_WARNING(sLogger, ("configName", mCtx->GetConfigName())("pluginIdx",mPluginIdx)("[Event] push queue failed!", ""));
+            }
         }
     }
 }
-HostMetadataHandler::HostMetadataHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx, int intervalSec) 
-    : mCtx(ctx), mQueueKey(key), mPluginIdx(idx) ,mIntervalSec(intervalSec) {
+HostMetadataHandler::HostMetadataHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx, int intervalSec)
+    : AbstractHandler(ctx, key, idx), mIntervalSec(intervalSec) {
     mFlag = true;
+    // TODO @qianlu.kk we need to move this into start function
     mReporter = std::thread(&HostMetadataHandler::ReportAgentInfo, this);
 }
 
@@ -193,19 +206,26 @@ void HostMetadataHandler::ReportAgentInfo() {
             }
         }
 
-        // TODO @qianlu.kk need to add lock to protect pipeline udpate ... 
-        std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
-        auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
-        if (res) {
-            LOG_WARNING(sLogger, ("[AgentInfo] push queue failed! status", res));
-        } else {
-            LOG_DEBUG(sLogger, ("[AgentInfo] push queue success!", ""));
+        {
+            ReadLock lk(mCtxLock);
+            if (!mCtx) {
+                continue;
+            }
+
+            std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), mPluginIdx);
+            auto res = ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item));
+            if (res) {
+                LOG_WARNING(sLogger, ("[AgentInfo] push queue failed! status", res));
+            } else {
+                LOG_DEBUG(sLogger, ("[AgentInfo] push queue success!", ""));
+            }
         }
+
         std::this_thread::sleep_for(std::chrono::seconds(mIntervalSec));
     }
 }
 
-bool HostMetadataHandler::handle(std::vector<std::string>& podIpVec) {
+bool HostMetadataHandler::handle(uint32_t pluginIndex, std::vector<std::string>& podIpVec) {
     std::vector<std::string> newContainerIds;
     std::vector<std::string> expiredContainerIds;
     std::unordered_set<std::string> newPodIps;
@@ -214,6 +234,12 @@ bool HostMetadataHandler::handle(std::vector<std::string>& podIpVec) {
 
     for (const auto& ip : podIpVec) {
         auto podInfo = K8sMetadata::GetInstance().GetInfoByIpFromCache(ip);
+        if (!podInfo || podInfo->appId == "") {
+            // filter appid ...
+            LOG_INFO(sLogger, (ip, "cannot fetch pod metadata or doesn't have arms label"));
+            continue;
+        }
+
         std::unique_ptr<SimplePodInfo> spi = std::make_unique<SimplePodInfo>(
             uint64_t(podInfo->timestamp), 
             podInfo->appId,
@@ -222,7 +248,10 @@ bool HostMetadataHandler::handle(std::vector<std::string>& podIpVec) {
             podInfo->podName,
             podInfo->containerIds);
         newHostPods[ip] = std::move(spi);
+        LOG_INFO(sLogger, ("appId", podInfo->appId) ("appName", podInfo->appName) ("podIp", podInfo->podIp) ("podName", podInfo->podName) (ip, "cannot fetch pod metadata or doesn't have arms label"));
     }
+
+    LOG_INFO(sLogger, ("begin to update local host metadata, pod list size:", newPodIps.size()) ("input pod list size", podIpVec.size()) ("host pod list size", mHostPods.size()));
     
     std::vector<std::string> addedPods;
     std::vector<std::string> removedPods;
@@ -246,7 +275,27 @@ bool HostMetadataHandler::handle(std::vector<std::string>& podIpVec) {
         // update cache ... 
         mHostPods = std::move(newHostPods);
     }
-    // TODO @qianlu.kk to be deleted —— remove from whitelist
+
+    std::string addPodsStr;
+    for (auto& ip : addedPods) {
+        addPodsStr += ip;
+        addPodsStr += ",";
+    }
+
+    std::string removePodsStr;
+    for (auto& ip : removedPods) {
+        removePodsStr += ip;
+        removePodsStr += ",";
+    }
+
+    std::string hostPodsStr;
+    for (auto& pod : mHostPods) {
+        hostPodsStr += pod.first;
+        hostPodsStr += ",";
+    }
+
+    // TODO @qianlu.kk handle remove pods and add pods info ... 
+    LOG_INFO(sLogger, ("after update, self pod list size", mHostPods.size())("add cids", addPodsStr) ("remove cids", removePodsStr) ("host cids", hostPodsStr));
 
     return true;
 }

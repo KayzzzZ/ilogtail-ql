@@ -19,6 +19,7 @@
 #include <gflags/gflags.h>
 #include <random>
 
+#include "core/metadata/K8sMetadata.h"
 #include "app_config/AppConfig.h"
 #include "ebpf/config.h"
 #include "ebpf/eBPFServer.h"
@@ -170,6 +171,7 @@ void eBPFServer::Init() {
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
     mEventCB = std::make_unique<EventHandler>(nullptr, -1, 0);
+    mHostMetadataCB = std::make_unique<HostMetadataHandler>(nullptr, -1, 0);
 #ifdef __ENTERPRISE__
     mMeterCB = std::make_unique<ArmsMeterHandler>(nullptr, -1, 0);
     mSpanCB = std::make_unique<ArmsSpanHandler>(nullptr, -1, 0);
@@ -198,6 +200,7 @@ void eBPFServer::Stop() {
     if (mEventCB) mEventCB->UpdateContext(nullptr, -1, -1);
     if (mMeterCB) mMeterCB->UpdateContext(nullptr, -1, -1);
     if (mSpanCB) mSpanCB->UpdateContext(nullptr,-1, -1);
+    if (mHostMetadataCB) mHostMetadataCB->UpdateContext(nullptr, -1, -1);
     if (mNetworkSecureCB) mNetworkSecureCB->UpdateContext(nullptr,-1, -1);
     if (mProcessSecureCB) mProcessSecureCB->UpdateContext(nullptr,-1, -1);
     if (mFileSecureCB) mFileSecureCB->UpdateContext(nullptr, -1, -1);
@@ -529,22 +532,59 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
             nconfig.enable_metric_ = true;
             nconfig.measure_cb_ = [this](auto events, auto ts) { return mMeterCB->handle(std::move(events), ts); };
             mMeterCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            mLogMockThread = std::thread(&eBPFServer::GenerateAgentInfo, this, ctx->GetProcessQueueKey(), plugin_index);
-            mMetricMockThread = std::thread(&eBPFServer::GenerateMetric, this, ctx->GetProcessQueueKey(), plugin_index);
+            // mLogMockThread = std::thread(&eBPFServer::GenerateAgentInfo, this, ctx->GetProcessQueueKey(), plugin_index);
+            // mMetricMockThread = std::thread(&eBPFServer::GenerateMetric, this, ctx->GetProcessQueueKey(), plugin_index);
             // mTraceMockThread = std::thread(&eBPFServer::GenerateSpan, this, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableSpan) {
             nconfig.enable_span_ = true;
             nconfig.span_cb_ = [this](auto events) { return mSpanCB->handle(std::move(events)); };
             mSpanCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            mTraceMockThread = std::thread(&eBPFServer::GenerateSpan, this, ctx->GetProcessQueueKey(), plugin_index);
+            // mTraceMockThread = std::thread(&eBPFServer::GenerateSpan, this, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableLog) {
             nconfig.enable_event_ = true;
             nconfig.event_cb_ = [this](auto events) { return mEventCB->handle(std::move(events)); };
             mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            mLogMockThread = std::thread(&eBPFServer::GenerateAgentInfo, this, ctx->GetProcessQueueKey(), plugin_index);
+            // mLogMockThread = std::thread(&eBPFServer::GenerateAgentInfo, this, ctx->GetProcessQueueKey(), plugin_index);
         }
+
+        // register K8s callback
+        mHostMetadataCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+        K8sMetadata::GetInstance().ResiterHostMetadataCallback(plugin_index, [this](uint32_t pluginIdx, std::vector<std::string>& cids) { return mHostMetadataCB->handle(pluginIdx, cids); });
+
+        // K8s env check
+        nconfig.metadata_by_cid_cb_ = [&](std::vector<std::string>&& cidVec, std::vector<std::unique_ptr<nami::PodMeta>>& metaVec) {
+            // K8sMetadata::GetInstance().GetInfoByContainerIdFromCache();
+            if (cidVec.size() != metaVec.size()) {
+                return false;
+            }
+            bool res;
+            auto metas = K8sMetadata::GetInstance().BlockingGetPodMetadataByContainerIds(std::move(cidVec), res);
+            if (!res) return false;
+            for (size_t i = 0; i < cidVec.size(); i ++) {
+                if (metas[i] != nullptr) {
+                    metaVec[i] = std::make_unique<nami::PodMeta>(metas[i]->appId, metas[i]->appName, metas[i]->k8sNamespace, metas[i]->workloadName, metas[i]->workloadKind, metas[i]->podName, metas[i]->podIp, metas[i]->serviceName);
+                } else {
+                    metaVec[i] = nullptr;
+                }
+            }
+            return true;
+        };
+        nconfig.metadata_by_ip_cb_ = [&](std::vector<std::string>&& ipVec, std::vector<std::unique_ptr<nami::PodMeta>>& metaVec) {
+            if (ipVec.size() != metaVec.size()) return false;
+            bool res;
+            std::vector<std::shared_ptr<k8sContainerInfo>> metas = K8sMetadata::GetInstance().BlockingGetPodMetadataByIps(std::move(ipVec), res);
+            if (!res) return false;
+            for (size_t i = 0; i < ipVec.size(); i ++) {
+                if (metas[i] != nullptr) {
+                    metaVec[i] = std::make_unique<nami::PodMeta>(metas[i]->appId, metas[i]->appName, metas[i]->k8sNamespace, metas[i]->workloadName, metas[i]->workloadKind, metas[i]->podName, metas[i]->podIp, metas[i]->serviceName);
+                } else {
+                    metaVec[i] = nullptr;
+                }
+            }
+            return true;
+        };
 
         config = std::move(nconfig);
         eBPFConfig->config_ = config;
@@ -683,6 +723,7 @@ void eBPFServer::UpdateCBContext(nami::PluginType type, const logtail::PipelineC
         if (mMeterCB) mMeterCB->UpdateContext(ctx, key, idx);
         if (mSpanCB) mSpanCB->UpdateContext(ctx, key, idx);
         if (mEventCB) mEventCB->UpdateContext(ctx, key, idx);
+        if (mHostMetadataCB) mHostMetadataCB->UpdateContext(ctx, key, idx);
         return;
     }
     case nami::PluginType::NETWORK_SECURITY:{

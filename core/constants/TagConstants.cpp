@@ -62,6 +62,27 @@ namespace logtail {
     const std::string DEFAULT_METRIC_TAG_CONTAINER_NAME = DEFAULT_TAG_CONTAINER_NAME;
     const std::string DEFAULT_METRIC_TAG_CONTAINER_IP = DEFAULT_TAG_CONTAINER_IP;
     const std::string DEFAULT_METRIC_TAG_IMAGE_NAME = DEFAULT_TAG_IMAGE_NAME;
+    const std::string DEFAULT_METRIC_TAG_PEER_POD_NAME = "pod_name";
+    const std::string DEFAULT_METRIC_TAG_POD_IP = "pod_ip";
+    const std::string DEFAULT_METRIC_TAG_PEER_POD_IP = "peer_pod_ip";
+    const std::string DEFAULT_METRIC_TAG_WORKLOAD_KIND = "workload_kind";
+    const std::string DEFAULT_METRIC_TAG_PEER_WORKLOAD_KIND = "peer_workload_kind";
+    const std::string DEFAULT_METRIC_TAG_WORKLOAD_NAME = "workload_name";
+    const std::string DEFAULT_METRIC_TAG_PEER_WORKLOAD_NAME = "peer_workload_name";
+    const std::string DEFAULT_METRIC_TAG_SERVICE_NAME = "service_name";
+    const std::string DEFAULT_METRIC_TAG_PEER_SERVICE_NAME = "peer_service_name";
+    const std::string DEFAULT_METRIC_TAG_HOST_NAME = "host_name";
+    const std::string DEFAULT_METRIC_TAG_HOST_IP = "host_ip";
+    const std::string DEFAULT_METRIC_TAG_PROCESS_PID = "process_pid";
+    const std::string DEFAULT_METRIC_TAG_CONTAINER_ID = "container_id";
+
+    const std::string DEFAULT_METRIC_TAG_ARMS_APP_ID = "arms_app_id";
+    const std::string DEFAULT_METRIC_TAG_ARMS_APP_NAME = "arms_app_name";
+    const std::string DEFAULT_METRIC_TAG_RPC = "rpc";
+    const std::string DEFAULT_METRIC_TAG_RPC_TYPE = "rpc_type";
+    const std::string DEFAULT_METRIC_TAG_CALL_KIND = "call_kind";
+    const std::string DEFAULT_METRIC_TAG_CALL_TYPE = "call_type";
+    const std::string DEFAULT_METRIC_TAG_STATUS_CODE = "status_code";
 
 ////////////////////////// TRACE ////////////////////////
     const std::string DEFAULT_TRACE_TAG_TRACE_ID = "traceId";
@@ -69,7 +90,6 @@ namespace logtail {
     const std::string DEFAULT_TRACE_TAG_PARENT_ID = "parentSpanId";
     const std::string DEFAULT_TRACE_TAG_SPAN_NAME = "spanName";
     const std::string DEFAULT_TRACE_TAG_SERVICE_NAME = "serviceName";
-    const std::string DEFAULT_TRACE_TAG_HOST_NAME = "hostName";
     const std::string DEFAULT_TRACE_TAG_START_TIME_NANO = "startTime";
     const std::string DEFAULT_TRACE_TAG_END_TIME_NANO = "endTime";
     const std::string DEFAULT_TRACE_TAG_DURATION = "duration";
@@ -86,4 +106,24 @@ namespace logtail {
     const std::string DEFAULT_TRACE_TAG_APP_ID = "pid";
     const std::string DEFAULT_TRACE_TAG_IP = "ip";
 
+
+///////// TOBE MERGED TRACE /////////
+    const std::string DEFAULT_TRACE_TAG_K8S_NAMESPACE = "k8s.namespace.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_POD_NAME = "k8s.pod.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_POD_NAME = "k8s.pod.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_POD_UID = "k8s.pod.uid";
+    const std::string DEFAULT_TRACE_TAG_K8S_POD_IP = "k8s.pod.ip";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_POD_IP = "k8s.peer.pod.ip";
+    const std::string DEFAULT_TRACE_TAG_K8S_WORKLOAD_KIND = "k8s.workload.kind";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_KIND = "k8s.peer.workload.kind";
+    const std::string DEFAULT_TRACE_TAG_K8S_WORKLOAD_NAME = "k8s.workload.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_NAME = "k8s.peer.workload.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_K8S_SERVICE_NAME = "k8s.service.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_SERVICE_NAME = "k8s.peer.service.name";
+    const std::string DEFAULT_TRACE_TAG_HOST_NAME = "host.name";
+    const std::string DEFAULT_TRACE_TAG_HOST_IP = "host.ip";
+    const std::string DEFAULT_TRACE_TAG_PROCESS_PID = "process.pid";
+    const std::string DEFAULT_TRACE_TAG_CONTAINER_NAME = "container.name";
+    const std::string DEFAULT_TRACE_TAG_CONTAINER_ID = "container.id";
+    const std::string DEFAULT_TRACE_TAG_IMAGE_NAME = "container.image.name";
 } // namespace logtail
