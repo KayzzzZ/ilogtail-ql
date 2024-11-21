@@ -59,6 +59,8 @@ bool K8sMetadata::FromInfoJson(const Json::Value& json, k8sContainerInfo& info) 
 
             if (key == appIdKey) {
                 info.appId = json[labelsKey][key].asString();
+            } else if (key == appNameKey) {
+                info.appName = json[labelsKey][key].asString();
             }
         }
     }
@@ -69,7 +71,13 @@ bool K8sMetadata::FromInfoJson(const Json::Value& json, k8sContainerInfo& info) 
     }
     info.workloadKind = json[workloadKindKey].asString();
     info.workloadName = json[workloadNameKey].asString();
-    info.timestamp = std::time(0);
+    info.podIp = json[podIpKey].asString();
+    info.podName = json[podNameKey].asString();
+    info.serviceName = json[serviceNameKey].asString();
+    info.startTime = json[startTimeKey].asInt64();
+    
+
+    // info.timestamp = std::time(0);
     return true;
 }
 

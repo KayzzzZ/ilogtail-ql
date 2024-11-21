@@ -27,12 +27,18 @@ DECLARE_FLAG_INT32(loong_collector_singleton_port);
 namespace logtail {
 
 const static std::string appIdKey = "armsAppId";
+const static std::string appNameKey = "armsAppName";
 const static std::string imageKey = "images";
 const static std::string labelsKey = "labels";
 const static std::string namespaceKey = "namespace";
 const static std::string workloadKindKey = "workloadKind";
 const static std::string workloadNameKey = "workloadName";
 const static std::string serviceNameKey = "serviceName";
+const static std::string podNameKey = "podName";
+const static std::string podIpKey = "podIP";
+const static std::string envKey = "envs";
+const static std::string containerIdKey = "containerIDs";
+const static std::string startTimeKey = "startTime";
 
 struct k8sContainerInfo {
     std::unordered_map<std::string, std::string> images;
@@ -41,11 +47,14 @@ struct k8sContainerInfo {
     std::string serviceName;
     std::string workloadKind;
     std::string workloadName;
+    // ??? 
     std::time_t timestamp;
     std::string appId;
     std::string appName;
     std::string podIp;
     std::string podName;
+    std::string serviceName;
+    int64_t startTime;
     std::vector<std::string> containerIds;
 };
 
