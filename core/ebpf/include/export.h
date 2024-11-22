@@ -10,6 +10,7 @@
 #include <functional>
 #include <map>
 #include <variant>
+#include <future>
 
 enum class SecureEventType {
   SECURE_EVENT_TYPE_SOCKET_SECURE,
@@ -252,6 +253,7 @@ public:
 };
 
 using K8sMetadataCallback = std::function<bool(std::vector<std::string>&&, std::vector<std::unique_ptr<PodMeta>>&)>;
+using AsyncK8sMetadataCallback = std::function<std::future<bool>(std::vector<std::string>&&, std::vector<std::unique_ptr<PodMeta>>&)>;
 
 struct NetworkObserveConfig {
   bool enable_libbpf_debug_ = false;
@@ -272,6 +274,12 @@ struct NetworkObserveConfig {
   NamiHandleBatchEventFunc event_cb_ = nullptr;
   K8sMetadataCallback metadata_by_cid_cb_ = nullptr;
   K8sMetadataCallback metadata_by_ip_cb_ = nullptr;
+  K8sMetadataCallback metadata_by_cid_cb_ = nullptr;
+  K8sMetadataCallback metadata_by_ip_cb_ = nullptr;
+  AsyncK8sMetadataCallback async_metadata_by_cid_cb_ = nullptr;
+  AsyncK8sMetadataCallback async_metadata_by_ip_cb_ = nullptr;
+  std::vector<std::string> enable_container_ids_;
+  std::vector<std::string> disable_container_ids_;
 
   bool operator==(const NetworkObserveConfig& other) const {
     return enable_libbpf_debug_ == other.enable_libbpf_debug_ &&

@@ -15,6 +15,8 @@
 #include <string>
 #include <curl/curl.h>
 #include <atomic>
+#include <mutex>
+#include <future>
 
 #include "common/LRUCache.h"
 #include "app_config/AppConfig.h"
@@ -72,8 +74,8 @@ using HostMetadataPostHandler = std::function<bool(uint32_t pluginIndex, std::ve
 
 class K8sMetadata {
 private:
-    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>> containerCache;
-    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>> ipCache;
+    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>, std::mutex> containerCache;
+    lru11::Cache<std::string, std::shared_ptr<k8sContainerInfo>, std::mutex> ipCache;
     std::string mServiceHost;
     int32_t mServicePort;
     std::string mHostIp;
@@ -102,11 +104,11 @@ public:
         return instance;
     }
     ~K8sMetadata() {
-        mFlag = false;
-        if (mPeriodicalRunner.joinable()) {
-            mPeriodicalRunner.join();
-        }
+        
     }
+
+    void StartFetchHostMetadata();
+    void StopFetchHostMetadata();
 
     void ResiterHostMetadataCallback(uint32_t plugin_index, HostMetadataPostHandler&& callback);
     void DeregisterHostMetadataCallback(uint32_t plugin_index);
@@ -114,21 +116,24 @@ public:
     // if cache not have,get from server
     std::vector<std::string> GetByContainerIdsFromServer(std::vector<std::string> containerIds, bool& status);
     // get pod metadatas for local host 
-    void GetByLocalHostFromServer();
+    bool GetByLocalHostFromServer();
     // 
     std::vector<std::string> GetByIpsFromServer(std::vector<std::string> ips, bool& status);
     // get info by container id from cache
     std::shared_ptr<k8sContainerInfo> GetInfoByContainerIdFromCache(const std::string& containerId);
     // get info by ip from cache
     std::shared_ptr<k8sContainerInfo> GetInfoByIpFromCache(const std::string& ip);
-    bool SendRequestToOperator(const std::string& urlHost, const std::string& output, containerInfoType infoType, std::vector<std::string>& resKey);
+    bool SendRequestToOperator(const std::string& urlHost, const std::string& request, containerInfoType infoType, std::vector<std::string>& resKey);
 
-    // BlockingGetPodMetadataByContainerIds
+    // SyncGetPodMetadataByContainerIds
     // if container info is not present in local cache, we will fetch it from remote server
-    std::vector<std::shared_ptr<k8sContainerInfo>> BlockingGetPodMetadataByContainerIds(std::vector<std::string>&&, bool& res);
-    // BlockingGetPodMetadataByIps 
+    std::vector<std::shared_ptr<k8sContainerInfo>> SyncGetPodMetadataByContainerIds(std::vector<std::string>&&, bool& res);
+    // SyncGetPodMetadataByIps 
     // if container info is not present in local cache, we will fetch it from remote server
-    std::vector<std::shared_ptr<k8sContainerInfo>> BlockingGetPodMetadataByIps(std::vector<std::string>&&, bool& res);
+    std::vector<std::shared_ptr<k8sContainerInfo>> SyncGetPodMetadataByIps(std::vector<std::string>&&, bool& res);
+
+    std::future<std::vector<std::shared_ptr<k8sContainerInfo>>> AsyncGetPodMetadataByIps(std::vector<std::string> ips);
+    std::future<std::vector<std::shared_ptr<k8sContainerInfo>>> AsyncGetPodMetadataByContainerIds(std::vector<std::string> containerIds);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class k8sMetadataUnittest;

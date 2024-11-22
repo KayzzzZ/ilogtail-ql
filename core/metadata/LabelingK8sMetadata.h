@@ -20,7 +20,7 @@
 
 namespace logtail {
 
-    const static std::string containerIdKey = "container.id";
+    const static std::string containerIdKeyFromTags = "container.id";
     const static std::string pidKey = "pid";
     const static std::string remoteIpKey = "remote_ip";
     const static std::string peerWorkloadNameKey = "peerWorkloadName";

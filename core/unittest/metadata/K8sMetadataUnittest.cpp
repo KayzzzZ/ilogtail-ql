@@ -51,11 +51,50 @@ public:
         auto& k8sMetadata = K8sMetadata::GetInstance();
         k8sMetadata.SetContainerCache(root);
         k8sMetadata.GetByLocalHostFromServer();
+        bool status;
+        auto ipRes = k8sMetadata.GetByIpsFromServer({"172.16.58.31"}, status);
+        APSARA_TEST_TRUE(status);
+        if (status) {
+            APSARA_TEST_EQUAL(ipRes.size(), 1);
+            auto meta = k8sMetadata.GetInfoByIpFromCache("172.16.58.31");
+            APSARA_TEST_TRUE(meta != nullptr);
+            APSARA_TEST_EQUAL(meta->podIp, "172.16.58.31");
+            APSARA_TEST_EQUAL(meta->podName, "arms-prometheus-ack-arms-prometheus-6b56894b68-h8ntl");
+            APSARA_TEST_EQUAL(meta->startTime, 1730361976);
+            APSARA_TEST_EQUAL(meta->containerIds.size(), 1);
+            APSARA_TEST_EQUAL(meta->containerIds[0], "eec2712ca21be822a939bbac5881c29997912d3195337ba361a4338bc99f355c");
+            APSARA_TEST_EQUAL(meta->workloadName, "arms-prometheus-ack-arms-prometheus");
+            APSARA_TEST_EQUAL(meta->workloadKind, "deployment");
+        }
         
         // Assume GetInfoByContainerIdFromCache returns non-null shared_ptr for valid IDs,
         // and check for some expectations.
         APSARA_TEST_TRUE_FATAL(k8sMetadata.GetInfoByContainerIdFromCache("containerd://286effd2650c0689b779018e42e9ec7aa3d2cb843005e038204e85fc3d4f9144") != nullptr);
 
+    }
+
+    void TestAsyncFetchMeta() {
+        K8sMetadata& metadata = K8sMetadata::GetInstance();
+
+        std::vector<std::string> ips = {"172.16.58.24", "172.16.58.31", "172.16.57.232"};
+        std::future<std::vector<std::shared_ptr<k8sContainerInfo>>> futureResults = metadata.AsyncGetPodMetadataByIps(ips);
+
+        // doing something else
+
+        // wait task
+        auto results = futureResults.get();
+        APSARA_TEST_EQUAL(results.size(), 3);
+        for (size_t i = 0; i < results.size(); ++i) {
+            APSARA_TEST_TRUE(results[i] != nullptr);
+        }
+        APSARA_TEST_EQUAL(results[0]->workloadKind, "deployment");
+        APSARA_TEST_EQUAL(results[0]->workloadName, "loongcollector-cluster");
+
+        APSARA_TEST_EQUAL(results[1]->workloadKind, "deployment");
+        APSARA_TEST_EQUAL(results[1]->workloadName, "arms-prometheus-ack-arms-prometheus");
+
+        APSARA_TEST_EQUAL(results[2]->workloadKind, "deployment");
+        APSARA_TEST_EQUAL(results[2]->workloadName, "kube-state-metrics");
     }
 
     void TestGetByLocalHost() {
@@ -421,6 +460,7 @@ APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestGetByContainerIds, 0);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestGetByLocalHost, 1);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAddLabelToMetric, 2);
 APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAddLabelToSpan, 3);
+APSARA_UNIT_TEST_CASE(k8sMetadataUnittest, TestAsyncFetchMeta, 4);
 
 
 

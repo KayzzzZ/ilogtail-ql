@@ -19,7 +19,7 @@
 #include <gflags/gflags.h>
 #include <random>
 
-#include "core/metadata/K8sMetadata.h"
+#include "metadata/K8sMetadata.h"
 #include "app_config/AppConfig.h"
 #include "ebpf/config.h"
 #include "ebpf/eBPFServer.h"
@@ -532,25 +532,21 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
             nconfig.enable_metric_ = true;
             nconfig.measure_cb_ = [this](auto events, auto ts) { return mMeterCB->handle(std::move(events), ts); };
             mMeterCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            // mLogMockThread = std::thread(&eBPFServer::GenerateAgentInfo, this, ctx->GetProcessQueueKey(), plugin_index);
-            // mMetricMockThread = std::thread(&eBPFServer::GenerateMetric, this, ctx->GetProcessQueueKey(), plugin_index);
-            // mTraceMockThread = std::thread(&eBPFServer::GenerateSpan, this, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableSpan) {
             nconfig.enable_span_ = true;
             nconfig.span_cb_ = [this](auto events) { return mSpanCB->handle(std::move(events)); };
             mSpanCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            // mTraceMockThread = std::thread(&eBPFServer::GenerateSpan, this, ctx->GetProcessQueueKey(), plugin_index);
         }
         if (opts->mEnableLog) {
             nconfig.enable_event_ = true;
             nconfig.event_cb_ = [this](auto events) { return mEventCB->handle(std::move(events)); };
             mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-            // mLogMockThread = std::thread(&eBPFServer::GenerateAgentInfo, this, ctx->GetProcessQueueKey(), plugin_index);
         }
 
         // register K8s callback
         mHostMetadataCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+        K8sMetadata::GetInstance().StartFetchHostMetadata();
         K8sMetadata::GetInstance().ResiterHostMetadataCallback(plugin_index, [this](uint32_t pluginIdx, std::vector<std::string>& cids) { return mHostMetadataCB->handle(pluginIdx, cids); });
 
         // K8s env check
@@ -560,7 +556,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
                 return false;
             }
             bool res;
-            auto metas = K8sMetadata::GetInstance().BlockingGetPodMetadataByContainerIds(std::move(cidVec), res);
+            auto metas = K8sMetadata::GetInstance().SyncGetPodMetadataByContainerIds(std::move(cidVec), res);
             if (!res) return false;
             for (size_t i = 0; i < cidVec.size(); i ++) {
                 if (metas[i] != nullptr) {
@@ -574,7 +570,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
         nconfig.metadata_by_ip_cb_ = [&](std::vector<std::string>&& ipVec, std::vector<std::unique_ptr<nami::PodMeta>>& metaVec) {
             if (ipVec.size() != metaVec.size()) return false;
             bool res;
-            std::vector<std::shared_ptr<k8sContainerInfo>> metas = K8sMetadata::GetInstance().BlockingGetPodMetadataByIps(std::move(ipVec), res);
+            std::vector<std::shared_ptr<k8sContainerInfo>> metas = K8sMetadata::GetInstance().SyncGetPodMetadataByIps(std::move(ipVec), res);
             if (!res) return false;
             for (size_t i = 0; i < ipVec.size(); i ++) {
                 if (metas[i] != nullptr) {
@@ -661,10 +657,11 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, nami::PluginTyp
     }
     mMonitorMgr->Release(type);
     if (type == nami::PluginType::NETWORK_OBSERVE) {
-        mGenerateFlag = false;
-        if (mMetricMockThread.joinable()) mMetricMockThread.join();
-        if (mTraceMockThread.joinable()) mTraceMockThread.join();
-        if (mLogMockThread.joinable()) mLogMockThread.join();
+        K8sMetadata::GetInstance().StopFetchHostMetadata();
+        // mGenerateFlag = false;
+        // if (mMetricMockThread.joinable()) mMetricMockThread.join();
+        // if (mTraceMockThread.joinable()) mTraceMockThread.join();
+        // if (mLogMockThread.joinable()) mLogMockThread.join();
     }
     bool ret = mSourceManager->StopPlugin(type);
     // UpdateContext must after than StopPlugin
