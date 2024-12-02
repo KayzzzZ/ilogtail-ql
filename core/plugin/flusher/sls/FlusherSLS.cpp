@@ -444,6 +444,18 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                             mContext->GetProjectName(),
                             mContext->GetLogstoreName(),
                             mContext->GetRegion());
+    } else {
+        // Logstore
+        if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                            mContext->GetAlarm(),
+                            errorMsg,
+                            sName,
+                            mContext->GetConfigName(),
+                            mContext->GetProjectName(),
+                            mContext->GetLogstoreName(),
+                            mContext->GetRegion());
+        }
     }
 
     // Batch

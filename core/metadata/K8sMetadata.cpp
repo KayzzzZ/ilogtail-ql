@@ -23,6 +23,7 @@
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
+#include "common/StringTools.h"
 
 using namespace std;
 
@@ -33,14 +34,23 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     return size * nmemb;
 }
 
-K8sMetadata::K8sMetadata(size_t cacheSize, int32_t fetchIntervalSec)
-        : containerCache(cacheSize, 0), 
-        ipCache(cacheSize, 0), 
+K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externalIpCacheSize, int32_t fetchIntervalSec)
+        : ipCache(ipCacheSize, 20), 
+        containerCache(cidCacheSize, 20), 
+        externalIpCache(externalIpCacheSize, 20),
         mFetchIntervalSeconds(fetchIntervalSec) {
     mServiceHost = STRING_FLAG(loong_collector_singleton_service);
     mServicePort = INT32_FLAG(loong_collector_singleton_port);
+    // TODO @qianlu.kk 
+    const char* value = getenv("_node_ip_");
+    if (value != NULL) {
+        mHostIp = StringTo<string>(value);
+    } else {
+        mHostIp = GetHostIp();
+    }
 #ifndef APSARA_UNIT_TEST_MAIN
-    mHostIp = GetHostIp();
+    // mHostIp = GetHostIp();
+    LOG_INFO(sLogger, ("[metadata] host ip", mHostIp));
 #else
     mServiceHost = "47.95.70.43";
     mServicePort = 8899;
@@ -150,6 +160,7 @@ void K8sMetadata::DeregisterHostMetadataCallback(uint32_t plugin_index) {
 }
 
 void K8sMetadata::LocalHostMetaRefresher() {
+    LOG_INFO(sLogger, ("enter", "LocalHostMetaRefresher"));
     Json::Value jsonObj;
     jsonObj["keys"].append(mHostIp);
     Json::StreamWriterBuilder writer;
@@ -157,6 +168,7 @@ void K8sMetadata::LocalHostMetaRefresher() {
     while(mFlag) {
         std::vector<std::string> podIpVec;
         bool res = SendRequestToOperator(mServiceHost, output, containerInfoType::HostInfo, podIpVec);
+        LOG_INFO(sLogger, ("begin to fetch localhost pod metadata, host", mHostIp) ("status", res));
 
         // do callbacks
         if (res && podIpVec.size()) {
@@ -180,7 +192,7 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
     HttpResponse res;
     std::string path = "/metadata/containerid";
     if (infoType == containerInfoType::IpInfo) {
-        path = "/metadata/ip";
+        path = "/metadata/ipport";
     } else if (infoType == containerInfoType::HostInfo) {
         path = "/metadata/host";
     }
@@ -238,7 +250,7 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
     }
 }
 
-std::vector<std::string> K8sMetadata::GetByContainerIdsFromServer(std::vector<std::string> containerIds, bool& status) {
+std::vector<std::string> K8sMetadata::GetByContainerIdsFromServer(std::vector<std::string>& containerIds, bool& status) {
     Json::Value jsonObj;
     for (auto& str : containerIds) {
         jsonObj["keys"].append(str);
@@ -287,7 +299,12 @@ void K8sMetadata::SetIpCache(const Json::Value& root) {
     }
 }
 
-std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string> ips, bool& status) {
+void K8sMetadata::SetExternalIpCache(const std::string& ip) {
+    LOG_INFO(sLogger, (ip, "is external, inset into cache ..."));
+    externalIpCache.insert(ip, uint8_t(0));
+}
+
+std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string>& ips, bool& status) {
     Json::Value jsonObj;
     for (auto& str : ips) {
         jsonObj["keys"].append(str);
@@ -296,6 +313,15 @@ std::vector<std::string> K8sMetadata::GetByIpsFromServer(std::vector<std::string
     Json::StreamWriterBuilder writer;
     std::string output = Json::writeString(writer, jsonObj);
     status = SendRequestToOperator(mServiceHost, output, containerInfoType::IpInfo, res);
+    std::set<std::string> hash;
+    for (auto& ip : res) {
+        hash.insert(ip);
+    }
+    for (auto& x : ips) {
+        if (!hash.count(x)) {
+            SetExternalIpCache(x);
+        }
+    }
     return res;
 }
 
@@ -310,6 +336,10 @@ std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByIpFromCache(const std::s
     if (ip.empty()) {
         return nullptr;
     }
+
+    return ipCache.get(ip);
+
+    // FIXME!! do we need expire mechanism??
     std::shared_ptr<k8sContainerInfo> ip_info = ipCache.get(ip);
     if (ip_info == nullptr) {
         return nullptr;
@@ -320,35 +350,36 @@ std::shared_ptr<k8sContainerInfo> K8sMetadata::GetInfoByIpFromCache(const std::s
     return ip_info;
 }
 
-std::vector<std::shared_ptr<k8sContainerInfo>> K8sMetadata::SyncGetPodMetadataByContainerIds(std::vector<std::string>&& cids, bool& res) {
-    std::vector<std::shared_ptr<k8sContainerInfo>> result;
-    result.reserve(cids.size());
+bool K8sMetadata::IsExternalIp(const std::string& ip) const {
+    return externalIpCache.contains(ip);
+}
+
+std::vector<std::shared_ptr<k8sContainerInfo>> K8sMetadata::SyncGetPodMetadataByContainerIds(std::vector<std::string>& cids, bool& res) {
+    std::vector<std::shared_ptr<k8sContainerInfo>> result(cids.size(), nullptr);
     std::vector<std::string> missingCids;
 
-    for (const auto& cid : cids) {
-        auto info = GetInfoByIpFromCache(cid);
+    for (size_t i = 0; i < cids.size(); i ++) {
+        auto info = GetInfoByContainerIdFromCache(cids[i]);
         if (info) {
-            result.push_back(info);
+            result[i] = info;
         } else {
-            result.push_back(nullptr);
-            missingCids.push_back(cid);
+            missingCids.push_back(cids[i]);
         }
     }
 
     if (!missingCids.empty()) {
         bool serverStatus;
-        GetByIpsFromServer(missingCids, serverStatus);
+        GetByContainerIdsFromServer(missingCids, serverStatus);
 
         if (!serverStatus) {
             res = false;
             return result;
         }
 
-        for (size_t i = 0, j = 0; i < result.size(); ++i) {
+        for (size_t i = 0; i < result.size(); ++i) {
             if (result[i] == nullptr) {
-                auto podMeta = K8sMetadata::GetInstance().GetInfoByIpFromCache(missingCids[j]);
+                auto podMeta = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cids[i]);
                 result[i] = podMeta;
-                ++j;
             }
         }
     }
@@ -358,18 +389,21 @@ std::vector<std::shared_ptr<k8sContainerInfo>> K8sMetadata::SyncGetPodMetadataBy
 
 }
 
-std::vector<std::shared_ptr<k8sContainerInfo>> K8sMetadata::SyncGetPodMetadataByIps(std::vector<std::string>&& ips, bool& res) {
-    std::vector<std::shared_ptr<k8sContainerInfo>> result;
-    result.reserve(ips.size());
+std::vector<std::shared_ptr<k8sContainerInfo>> K8sMetadata::SyncGetPodMetadataByIps(std::vector<std::string>& ips, bool& res) {
+    std::vector<std::shared_ptr<k8sContainerInfo>> result(ips.size(), nullptr);
     std::vector<std::string> missingIps;
 
-    for (const auto& ip : ips) {
-        auto info = GetInfoByIpFromCache(ip);
+    for (size_t i = 0 ; i < ips.size(); i ++ ) {
+        if (IsExternalIp(ips[i])) {
+            result[i] = nullptr;
+            LOG_INFO(sLogger, (ips[i], "external, set nullptr to metadata"));
+            continue;
+        }
+        auto info = GetInfoByIpFromCache(ips[i]);
         if (info) {
-            result.push_back(info);
+            result[i] = info;
         } else {
-            result.push_back(nullptr);
-            missingIps.push_back(ip);
+            missingIps.push_back(ips[i]);
         }
     }
 
@@ -382,11 +416,10 @@ std::vector<std::shared_ptr<k8sContainerInfo>> K8sMetadata::SyncGetPodMetadataBy
             return result;
         }
 
-        for (size_t i = 0, j = 0; i < result.size(); ++i) {
+        for (size_t i = 0; i < result.size(); ++i) {
             if (result[i] == nullptr) {
-                auto podMeta = K8sMetadata::GetInstance().GetInfoByIpFromCache(missingIps[j]);
+                auto podMeta = K8sMetadata::GetInstance().GetInfoByIpFromCache(ips[i]);
                 result[i] = podMeta;
-                ++j;
             }
         }
     }
@@ -396,7 +429,7 @@ std::vector<std::shared_ptr<k8sContainerInfo>> K8sMetadata::SyncGetPodMetadataBy
     
 }
 
-std::future<std::vector<std::shared_ptr<k8sContainerInfo>>> K8sMetadata::AsyncGetPodMetadataByIps(std::vector<std::string> ips) {
+std::future<std::vector<std::shared_ptr<k8sContainerInfo>>> K8sMetadata::AsyncGetPodMetadataByIps(std::vector<std::string>& ips) {
     return std::async(std::launch::async, [this, ips] {
         std::vector<std::shared_ptr<k8sContainerInfo>> result;
         result.reserve(ips.size());
@@ -435,7 +468,7 @@ std::future<std::vector<std::shared_ptr<k8sContainerInfo>>> K8sMetadata::AsyncGe
     });
 }
 
-std::future<std::vector<std::shared_ptr<k8sContainerInfo>>> K8sMetadata::AsyncGetPodMetadataByContainerIds(std::vector<std::string> containerIds) {
+std::future<std::vector<std::shared_ptr<k8sContainerInfo>>> K8sMetadata::AsyncGetPodMetadataByContainerIds(std::vector<std::string>& containerIds) {
     return std::async(std::launch::async, [this, containerIds] {
         std::vector<std::shared_ptr<k8sContainerInfo>> result;
         result.reserve(containerIds.size());

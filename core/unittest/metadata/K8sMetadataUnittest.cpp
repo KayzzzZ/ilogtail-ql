@@ -52,7 +52,8 @@ public:
         k8sMetadata.SetContainerCache(root);
         k8sMetadata.GetByLocalHostFromServer();
         bool status;
-        auto ipRes = k8sMetadata.GetByIpsFromServer({"172.16.58.31"}, status);
+        std::vector<std::string> testIps0 = {"172.16.58.31"};
+        auto ipRes = k8sMetadata.GetByIpsFromServer(testIps0, status);
         APSARA_TEST_TRUE(status);
         if (status) {
             APSARA_TEST_EQUAL(ipRes.size(), 1);

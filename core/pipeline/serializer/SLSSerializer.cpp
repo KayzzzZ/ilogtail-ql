@@ -182,6 +182,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         return false;
     }
 
+    std::string groupTagsString;
     // loggroup.category is deprecated, no need to set
     for (const auto& tag : group.mTags.mInner) {
         if (tag.first == LOG_RESERVED_KEY_TOPIC || tag.first == LOG_RESERVED_KEY_SOURCE
@@ -190,6 +191,9 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         } else {
             logGroupSZ += GetLogTagSize(tag.first.size(), tag.second.size());
         }
+
+        // TODO @qianlu.kk remove codes
+        groupTagsString += (tag.first.to_string() + ":" + tag.second.to_string() + "#");
     }
 
     if (static_cast<int32_t>(logGroupSZ) > INT32_FLAG(max_send_log_group_size)) {
@@ -227,7 +231,11 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                 serializer.AddLogContentMetricTimeNano(metricEvent);
                 serializer.AddLogContent(METRIC_RESERVED_KEY_VALUE, metricEventContentCache[i].first);
                 serializer.AddLogContent(METRIC_RESERVED_KEY_NAME, metricEvent.GetName());
-                LOG_INFO(sLogger, ("metric name", metricEvent.GetName()) ("serialize done", ""));
+                LOG_INFO(sLogger, ("metric name", metricEvent.GetName())
+                    ("metric label", metricEventContentCache[i].first)
+                    ("group tag", groupTagsString)
+                    ("value", to_string(metricEvent.GetValue<UntypedSingleValue>()->mValue))
+                    ("serialize done", "") );
             }
             break;
         case PipelineEvent::Type::SPAN:

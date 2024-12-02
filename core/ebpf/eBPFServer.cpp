@@ -172,13 +172,13 @@ void eBPFServer::Init() {
     mAdminConfig.LoadEbpfConfig(configJson);
     mEventCB = std::make_unique<EventHandler>(nullptr, -1, 0);
     mHostMetadataCB = std::make_unique<HostMetadataHandler>(nullptr, -1, 0);
-#ifdef __ENTERPRISE__
+// #ifdef __ENTERPRISE__
     mMeterCB = std::make_unique<ArmsMeterHandler>(nullptr, -1, 0);
     mSpanCB = std::make_unique<ArmsSpanHandler>(nullptr, -1, 0);
-#else
-    mMeterCB = std::make_unique<OtelMeterHandler>(nullptr, -1, 0);
-    mSpanCB = std::make_unique<OtelSpanHandler>(nullptr, -1, 0);
-#endif
+// #else
+//     mMeterCB = std::make_unique<OtelMeterHandler>(nullptr, -1, 0);
+//     mSpanCB = std::make_unique<OtelSpanHandler>(nullptr, -1, 0);
+// #endif
 
     mNetworkSecureCB = std::make_unique<SecurityHandler>(nullptr, -1, 0);
     mProcessSecureCB = std::make_unique<SecurityHandler>(nullptr, -1, 0);
@@ -544,19 +544,21 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
             mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         }
 
-        // register K8s callback
+        // TODO @qianlu.kk register K8s callback
+        nconfig.enable_cid_filter = opts->mEnableCidFilter;
+        nconfig.enable_container_ids_ = opts->mEnableCids;
         mHostMetadataCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
         K8sMetadata::GetInstance().StartFetchHostMetadata();
         K8sMetadata::GetInstance().ResiterHostMetadataCallback(plugin_index, [this](uint32_t pluginIdx, std::vector<std::string>& cids) { return mHostMetadataCB->handle(pluginIdx, cids); });
 
         // K8s env check
-        nconfig.metadata_by_cid_cb_ = [&](std::vector<std::string>&& cidVec, std::vector<std::unique_ptr<nami::PodMeta>>& metaVec) {
+        nconfig.metadata_by_cid_cb_ = [&](std::vector<std::string>& cidVec, std::vector<std::unique_ptr<nami::PodMeta>>& metaVec) {
             // K8sMetadata::GetInstance().GetInfoByContainerIdFromCache();
             if (cidVec.size() != metaVec.size()) {
                 return false;
             }
             bool res;
-            auto metas = K8sMetadata::GetInstance().SyncGetPodMetadataByContainerIds(std::move(cidVec), res);
+            auto metas = K8sMetadata::GetInstance().SyncGetPodMetadataByContainerIds(cidVec, res);
             if (!res) return false;
             for (size_t i = 0; i < cidVec.size(); i ++) {
                 if (metas[i] != nullptr) {
@@ -567,10 +569,10 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
             }
             return true;
         };
-        nconfig.metadata_by_ip_cb_ = [&](std::vector<std::string>&& ipVec, std::vector<std::unique_ptr<nami::PodMeta>>& metaVec) {
+        nconfig.metadata_by_ip_cb_ = [&](std::vector<std::string>& ipVec, std::vector<std::unique_ptr<nami::PodMeta>>& metaVec) {
             if (ipVec.size() != metaVec.size()) return false;
             bool res;
-            std::vector<std::shared_ptr<k8sContainerInfo>> metas = K8sMetadata::GetInstance().SyncGetPodMetadataByIps(std::move(ipVec), res);
+            std::vector<std::shared_ptr<k8sContainerInfo>> metas = K8sMetadata::GetInstance().SyncGetPodMetadataByIps(ipVec, res);
             if (!res) return false;
             for (size_t i = 0; i < ipVec.size(); i ++) {
                 if (metas[i] != nullptr) {
@@ -580,6 +582,56 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
                 }
             }
             return true;
+        };
+        nconfig.metadata_by_cid_cache_ = [&](const std::string& cid) -> std::unique_ptr<nami::PodMeta> {
+            auto info = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(cid);
+            LOG_INFO(sLogger, 
+                ("cid", cid) 
+                ("isNull", info == nullptr) 
+                ("appId", info == nullptr ? "null" : info->appId)
+                ("podName", info == nullptr ? "null" : info->podName)
+                ("podIp", info == nullptr ? "null" : info->podIp)
+                ("workloadKind", info == nullptr ? "null" : info->workloadKind)
+                ("workloadName", info == nullptr ? "null" : info->workloadName)
+                ("serviceName", info == nullptr ? "null" : info->serviceName)
+            );
+            if (info) {
+                return std::make_unique<nami::PodMeta>(
+                    info->appId, 
+                    info->appName, 
+                    info->k8sNamespace, 
+                    info->workloadName, 
+                    info->workloadKind, 
+                    info->podName, 
+                    info->podIp, 
+                    info->serviceName);
+            }
+            return nullptr;
+        };
+        nconfig.metadata_by_ip_cache_ = [&](const std::string& ip) -> std::unique_ptr<nami::PodMeta> {
+            auto info = K8sMetadata::GetInstance().GetInfoByIpFromCache(ip);
+            LOG_INFO(sLogger, 
+                ("ip", ip) 
+                ("isNull", info == nullptr) 
+                ("appId", info == nullptr ? "null" : info->appId)
+                ("podName", info == nullptr ? "null" : info->podName)
+                ("podIp", info == nullptr ? "null" : info->podIp)
+                ("workloadKind", info == nullptr ? "null" : info->workloadKind)
+                ("workloadName", info == nullptr ? "null" : info->workloadName)
+                ("serviceName", info == nullptr ? "null" : info->serviceName)
+            );
+            if (info) {
+                return std::make_unique<nami::PodMeta>(
+                    info->appId, 
+                    info->appName, 
+                    info->k8sNamespace, 
+                    info->workloadName, 
+                    info->workloadKind, 
+                    info->podName, 
+                    info->podIp, 
+                    info->serviceName);
+            }
+            return nullptr;
         };
 
         config = std::move(nconfig);

@@ -45,7 +45,7 @@ namespace ebpf {
     event->SetValue(UntypedSingleValue{(double)inner->FIELD_NAME});} \
 
 #define GENERATE_METRICS(FUNC_NAME, MEASURE_TYPE, INNER_TYPE, METRIC_NAME, FIELD_NAME) \
-void FUNC_NAME(PipelineEventGroup& group, std::unique_ptr<Measure>& measure, uint64_t ts) { \
+void FUNC_NAME(PipelineEventGroup& group, std::unique_ptr<Measure>& measure, uint64_t tsSec, uint64_t tsNano) { \
     if (measure->type_ != MEASURE_TYPE) return; \
     auto inner = static_cast<INNER_TYPE*>(measure->inner_measure_.get()); \
     if (!inner->FIELD_NAME) return; \
@@ -54,7 +54,7 @@ void FUNC_NAME(PipelineEventGroup& group, std::unique_ptr<Measure>& measure, uin
         event->SetTag(tag.first, tag.second); \
     } \
     event->SetName(METRIC_NAME); \
-    event->SetTimestamp(ts); \
+    event->SetTimestamp(tsSec, tsNano); \
     event->SetValue(UntypedSingleValue{(double)inner->FIELD_NAME}); \
 }
 
@@ -185,7 +185,6 @@ const std::string startTimestampKey = "startTimeStamp";
 const std::string dataTypeKey = "data_type";
 const std::string agentInfoStr = "agent_info";
 
-
 void HostMetadataHandler::ReportAgentInfo() {
     while(mFlag) {
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
@@ -195,6 +194,7 @@ void HostMetadataHandler::ReportAgentInfo() {
         {
             ReadLock lk(mLock);
             for (const auto& [ip, spi] : mHostPods) {
+                // generate agentinfo
                 auto logEvent = eventGroup.AddLogEvent();
                 logEvent->SetContent(pidKey, spi->mAppId);
                 logEvent->SetContent(appNameKey, spi->mAppName);
@@ -203,6 +203,12 @@ void HostMetadataHandler::ReportAgentInfo() {
                 logEvent->SetContent(agentVersionKey, "1.0.0");
                 logEvent->SetContent(startTimestampKey, std::to_string(spi->mStartTime));
                 logEvent->SetTimestamp(nowSec);
+
+                // TODO @qianlu.kk generate host tags
+                auto metricEvent = eventGroup.AddMetricEvent();
+                metricEvent->SetName("arms_tag_entity");
+                metricEvent->SetTagNoCopy("hostname", "");
+                metricEvent->SetValue(UntypedSingleValue{1.0});
             }
         }
 
@@ -300,10 +306,16 @@ bool HostMetadataHandler::handle(uint32_t pluginIndex, std::vector<std::string>&
     return true;
 }
 
-#ifdef __ENTERPRISE__
+// #ifdef __ENTERPRISE__
+const static std::string app_name_key = "service";
+const static std::string app_id_key = "pid";
+const static std::string ip_key = "serverIp";
+const static std::string host_key = "host";
 
-const static std::string app_id_key = "arms.appId";
-const static std::string ip_key = "ip";
+const static std::string app_id_key_span = "arms.appId";
+const static std::string service_name_key = "service.name";
+const static std::string host_ip_key = "host.ip";
+const static std::string host_name_key = "host.name";
 
 const static std::string rpc_request_total_count = "arms_rpc_requests_count";
 const static std::string rpc_request_slow_count = "arms_rpc_requests_slow_count";
@@ -321,7 +333,7 @@ GENERATE_METRICS(GenerateRequestsSlowMetrics, MeasureType::MEASURE_TYPE_APP, App
 GENERATE_METRICS(GenerateRequestsErrorMetrics, MeasureType::MEASURE_TYPE_APP, AppSingleMeasure, rpc_request_err_count, error_total_)
 GENERATE_METRICS(GenerateRequestsDurationSumMetrics, MeasureType::MEASURE_TYPE_APP, AppSingleMeasure, rpc_request_status_count, duration_ms_sum_)
 
-void GenerateRequestsStatusMetrics(PipelineEventGroup& group, std::unique_ptr<Measure>& measure, uint64_t ts) {
+void GenerateRequestsStatusMetrics(PipelineEventGroup& group, std::unique_ptr<Measure>& measure, uint64_t ts, uint64_t tsNano) {
     if (measure->type_ != MeasureType::MEASURE_TYPE_APP) return;
     auto inner = static_cast<AppSingleMeasure*>(measure->inner_measure_.get());
     ADD_STATUS_METRICS(rpc_request_status_count, status_2xx_count_, status_2xx_key);
@@ -353,7 +365,13 @@ void ArmsSpanHandler::handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&
     for (auto& span : spans) {
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
-        eventGroup.SetTag(app_id_key, span->app_id_);
+        eventGroup.SetTag(app_id_key_span, span->app_id_);
+        eventGroup.SetTag(service_name_key, span->app_name_);
+        eventGroup.SetTag(host_ip_key, span->host_ip_);
+        eventGroup.SetTag(host_name_key, span->host_name_);
+        eventGroup.SetTagNoCopy("data_type", "trace");
+        eventGroup.SetTagNoCopy("arms.app.type", "ebpf");
+
         for (auto& x : span->single_spans_) {
             auto spanEvent = eventGroup.AddSpanEvent();
             for (auto& tag : x->tags_) {
@@ -379,32 +397,39 @@ void ArmsSpanHandler::handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&
     return;
 }
 
-void ArmsMeterHandler::handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t timestamp) {
+void ArmsMeterHandler::handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t tsSec) {
     if (measures.empty()) return;
 
     for (auto& appBatchMeasures : measures) {
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();;
         PipelineEventGroup eventGroup(sourceBuffer);
-        
-        // source_ip
-        eventGroup.SetTag(std::string(app_id_key), appBatchMeasures->app_id_);
-        eventGroup.SetTag(std::string(ip_key), appBatchMeasures->ip_);
+        LOG_INFO(sLogger, ("receive measures size", measures.size()) ("second", tsSec) 
+            ("app name", appBatchMeasures->app_name_)
+            ("app id", appBatchMeasures->app_id_)
+            ("ip", appBatchMeasures->ip_)
+            ("host", appBatchMeasures->host_));
+        eventGroup.SetTag(app_name_key, appBatchMeasures->app_name_);
+        eventGroup.SetTag(app_id_key, appBatchMeasures->app_id_);
+        eventGroup.SetTag(ip_key, appBatchMeasures->ip_);
+        eventGroup.SetTag(host_key, appBatchMeasures->host_);
+        eventGroup.SetTagNoCopy("source", "ebpf");
+        eventGroup.SetTagNoCopy("data_type", "metric");
         for (auto& measure : appBatchMeasures->measures_) {
             auto type = measure->type_;
             if (type == MeasureType::MEASURE_TYPE_APP) {
-                GenerateRequestsTotalMetrics(eventGroup, measure, timestamp);
-                GenerateRequestsSlowMetrics(eventGroup, measure, timestamp);
-                GenerateRequestsErrorMetrics(eventGroup, measure, timestamp);
-                GenerateRequestsDurationSumMetrics(eventGroup, measure, timestamp);
-                GenerateRequestsStatusMetrics(eventGroup, measure, timestamp);
+                GenerateRequestsTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateRequestsSlowMetrics(eventGroup, measure, tsSec, 0);
+                GenerateRequestsErrorMetrics(eventGroup, measure, tsSec, 0);
+                GenerateRequestsDurationSumMetrics(eventGroup, measure, tsSec, 0);
+                GenerateRequestsStatusMetrics(eventGroup, measure, tsSec, 0);
             } else if (type == MeasureType::MEASURE_TYPE_NET) {
-                GenerateTcpDropTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpRetransTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpConnectionTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpRecvPktsTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpRecvBytesTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpSendPktsTotalMetrics(eventGroup, measure, timestamp);
-                GenerateTcpSendBytesTotalMetrics(eventGroup, measure, timestamp);
+                GenerateTcpDropTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpRetransTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpConnectionTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpRecvPktsTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpRecvBytesTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpSendPktsTotalMetrics(eventGroup, measure, tsSec, 0);
+                GenerateTcpSendBytesTotalMetrics(eventGroup, measure, tsSec, 0);
             }
             mProcessTotalCnt++;
         }
@@ -421,7 +446,7 @@ void ArmsMeterHandler::handle(std::vector<std::unique_ptr<ApplicationBatchMeasur
     return;
 }
 
-#endif
+// #endif
 
 }
 }

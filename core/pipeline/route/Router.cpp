@@ -57,7 +57,7 @@ vector<pair<size_t, PipelineEventGroup>> Router::Route(PipelineEventGroup& g) co
         }
     }
     if (g.GetTag("data_type") == "agent_info" || g.GetTag("data_type") == "trace" || g.GetTag("data_type") == "metric") {
-        LOG_WARNING(sLogger, ("agent_info dest size", dest.size()) ("data_type", g.GetTag("data_type").to_string()));
+        LOG_WARNING(sLogger, ("dest size", dest.size()) ("data_type", g.GetTag("data_type").to_string()));
     }
 
     auto resSz = dest.size() + mAlwaysMatchedFlusherIdx.size();

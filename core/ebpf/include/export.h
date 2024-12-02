@@ -105,8 +105,9 @@ struct Measure {
 // process
 struct ApplicationBatchMeasure {
   std::string app_id_;
-  std::string region_id_;
+  std::string app_name_;
   std::string ip_;
+  std::string host_;
   std::vector<std::unique_ptr<Measure>> measures_;
 };
 
@@ -124,6 +125,9 @@ struct SingleSpan {
 
 struct ApplicationBatchSpan {
   std::string app_id_;
+  std::string app_name_;
+  std::string host_ip_;
+  std::string host_name_;
   std::vector<std::unique_ptr<SingleSpan>> single_spans_;
 };
 
@@ -193,6 +197,8 @@ struct ObserverNetworkOption {
     bool mEnableSpan = false;
     bool mEnableMetric = false;
     bool mEnableLog = true;
+    bool mEnableCidFilter = true;
+    std::vector<std::string> mEnableCids;
     std::string mMeterHandlerType;
     std::string mSpanHandlerType;
 };
@@ -252,8 +258,9 @@ public:
   std::string service_name_;
 };
 
-using K8sMetadataCallback = std::function<bool(std::vector<std::string>&&, std::vector<std::unique_ptr<PodMeta>>&)>;
-using AsyncK8sMetadataCallback = std::function<std::future<bool>(std::vector<std::string>&&, std::vector<std::unique_ptr<PodMeta>>&)>;
+using K8sMetadataCacheCallback = std::function<std::unique_ptr<PodMeta>(const std::string&)>;
+using K8sMetadataCallback = std::function<bool(std::vector<std::string>&, std::vector<std::unique_ptr<PodMeta>>&)>;
+using AsyncK8sMetadataCallback = std::function<std::future<bool>(std::vector<std::string>&, std::vector<std::unique_ptr<PodMeta>>&)>;
 
 struct NetworkObserveConfig {
   bool enable_libbpf_debug_ = false;
@@ -269,15 +276,16 @@ struct NetworkObserveConfig {
   bool enable_span_ = false;
   bool enable_metric_ = false;
   bool enable_event_ = false;
+  bool enable_cid_filter = false;
   NamiHandleBatchMeasureFunc measure_cb_ = nullptr;
   NamiHandleBatchSpanFunc span_cb_ = nullptr;
   NamiHandleBatchEventFunc event_cb_ = nullptr;
   K8sMetadataCallback metadata_by_cid_cb_ = nullptr;
   K8sMetadataCallback metadata_by_ip_cb_ = nullptr;
-  K8sMetadataCallback metadata_by_cid_cb_ = nullptr;
-  K8sMetadataCallback metadata_by_ip_cb_ = nullptr;
   AsyncK8sMetadataCallback async_metadata_by_cid_cb_ = nullptr;
   AsyncK8sMetadataCallback async_metadata_by_ip_cb_ = nullptr;
+  K8sMetadataCacheCallback metadata_by_cid_cache_ = nullptr;
+  K8sMetadataCacheCallback metadata_by_ip_cache_ = nullptr;
   std::vector<std::string> enable_container_ids_;
   std::vector<std::string> disable_container_ids_;
 

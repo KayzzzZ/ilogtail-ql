@@ -83,6 +83,7 @@ public:
     bool IsSupportedEnv(nami::PluginType type);
 
     std::string GetAllProjects();
+    
     void GenerateMetric(logtail::QueueKey key, uint32_t idx);
     void GenerateSpan(logtail::QueueKey key, uint32_t idx);
     void GenerateAgentInfo(logtail::QueueKey key, uint32_t idx);

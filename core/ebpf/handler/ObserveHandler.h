@@ -35,7 +35,7 @@ public:
 class OtelMeterHandler : public MeterHandler {
 public:
     OtelMeterHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : MeterHandler(ctx, key, idx) {}
-    void handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t timestamp) override;
+    void handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t tsSec) override;
 };
 
 class SpanHandler : public AbstractHandler {
@@ -88,12 +88,12 @@ private:
     int mIntervalSec;
 };
 
-#ifdef __ENTERPRISE__
+// #ifdef __ENTERPRISE__
 
 class ArmsMeterHandler : public MeterHandler {
 public:
     ArmsMeterHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx) : MeterHandler(ctx, key, idx) {}
-    void handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t timestamp) override;
+    void handle(std::vector<std::unique_ptr<ApplicationBatchMeasure>>&& measures, uint64_t tsSec) override;
 };
 
 class ArmsSpanHandler : public SpanHandler {
@@ -102,7 +102,7 @@ public:
     void handle(std::vector<std::unique_ptr<ApplicationBatchSpan>>&&) override;
 };
 
-#endif
+// #endif
 
 }
 }
