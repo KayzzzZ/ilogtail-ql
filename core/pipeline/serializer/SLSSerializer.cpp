@@ -232,7 +232,7 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
                 serializer.AddLogContent(METRIC_RESERVED_KEY_VALUE, metricEventContentCache[i].first);
                 serializer.AddLogContent(METRIC_RESERVED_KEY_NAME, metricEvent.GetName());
                 LOG_INFO(sLogger, ("metric name", metricEvent.GetName())
-                    ("metric label", metricEventContentCache[i].first)
+                    ("metric label", serializer.GetResult())
                     ("group tag", groupTagsString)
                     ("value", to_string(metricEvent.GetValue<UntypedSingleValue>()->mValue))
                     ("serialize done", "") );

@@ -96,7 +96,7 @@ private:
     void SetContainerCache(const Json::Value& root);
     void SetExternalIpCache(const std::string&);
     bool FromInfoJson(const Json::Value& json, k8sContainerInfo& info);
-    bool FromContainerJson(const Json::Value& json, std::shared_ptr<ContainerData> data);
+    bool FromContainerJson(const Json::Value& json, std::shared_ptr<ContainerData> data, containerInfoType infoType);
     void LocalHostMetaRefresher();
 
 public:

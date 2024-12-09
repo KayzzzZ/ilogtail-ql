@@ -172,6 +172,9 @@ void eBPFServer::Init() {
     mAdminConfig.LoadEbpfConfig(configJson);
     mEventCB = std::make_unique<EventHandler>(nullptr, -1, 0);
     mHostMetadataCB = std::make_unique<HostMetadataHandler>(nullptr, -1, 0);
+    mHostMetadataCB->RegisterUpdatePluginCallback([&](nami::PluginType type, UpdataType updateType, const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> ops) {
+        return UpdatePlugin(type, updateType, ops);
+    });
 // #ifdef __ENTERPRISE__
     mMeterCB = std::make_unique<ArmsMeterHandler>(nullptr, -1, 0);
     mSpanCB = std::make_unique<ArmsSpanHandler>(nullptr, -1, 0);
@@ -548,7 +551,6 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
         nconfig.enable_cid_filter = opts->mEnableCidFilter;
         nconfig.enable_container_ids_ = opts->mEnableCids;
         mHostMetadataCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
-        K8sMetadata::GetInstance().StartFetchHostMetadata();
         K8sMetadata::GetInstance().ResiterHostMetadataCallback(plugin_index, [this](uint32_t pluginIdx, std::vector<std::string>& cids) { return mHostMetadataCB->handle(pluginIdx, cids); });
 
         // K8s env check
@@ -637,6 +639,7 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name, uint32_t 
         config = std::move(nconfig);
         eBPFConfig->config_ = config;
         ret = mSourceManager->StartPlugin(type, std::move(eBPFConfig));
+        K8sMetadata::GetInstance().StartFetchHostMetadata();
 
         break;
     }
@@ -684,6 +687,31 @@ bool eBPFServer::HasRegisteredPlugins() const {
         if (!pipeline.empty()) return true;
     }
     return false;
+}
+
+bool eBPFServer::UpdatePlugin(nami::PluginType type, UpdataType updateType, const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options) {
+    auto eBPFConfig = std::make_unique<nami::eBPFConfig>();
+    eBPFConfig->plugin_type_ = type;
+    switch (type)
+    {
+    case nami::PluginType::NETWORK_OBSERVE:{
+        nami::NetworkObserveConfig nconfig;
+        nami::ObserverNetworkOption* opts = std::get<nami::ObserverNetworkOption*>(options);
+        nconfig.enable_cid_filter = true;
+        nconfig.enable_container_ids_ = opts->mEnableCids;
+        nconfig.disable_container_ids_ = opts->mDisableCids;
+        eBPFConfig->config_ = nconfig;
+        eBPFConfig->type = updateType;
+        LOG_INFO(sLogger, 
+            ("enable_container_ids_ size", nconfig.enable_container_ids_.size()) 
+            ("disable_container_ids_ size", nconfig.disable_container_ids_.size()));
+        break;
+    }
+    default:
+        LOG_ERROR(sLogger, (std::to_string(int(type)), " not support to update plugin ..."));
+        break;
+    }
+    return mSourceManager->UpdatePlugin(type, std::move(eBPFConfig), updateType);
 }
 
 bool eBPFServer::EnablePlugin(const std::string& pipeline_name, uint32_t plugin_index,

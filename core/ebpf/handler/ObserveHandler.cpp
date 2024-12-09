@@ -195,6 +195,9 @@ void HostMetadataHandler::ReportAgentInfo() {
             ReadLock lk(mLock);
             for (const auto& [ip, spi] : mHostPods) {
                 // generate agentinfo
+                LOG_INFO(sLogger, ("AGENT_INFO appid", spi->mAppId)
+                    ("appname", spi->mAppName)
+                    ("ip", spi->mPodIp) ("hostname", spi->mPodName) ("agentVersion", "1.0.0") ("startTs", std::to_string(spi->mStartTime)));
                 auto logEvent = eventGroup.AddLogEvent();
                 logEvent->SetContent(pidKey, spi->mAppId);
                 logEvent->SetContent(appNameKey, spi->mAppName);
@@ -205,10 +208,10 @@ void HostMetadataHandler::ReportAgentInfo() {
                 logEvent->SetTimestamp(nowSec);
 
                 // TODO @qianlu.kk generate host tags
-                auto metricEvent = eventGroup.AddMetricEvent();
-                metricEvent->SetName("arms_tag_entity");
-                metricEvent->SetTagNoCopy("hostname", "");
-                metricEvent->SetValue(UntypedSingleValue{1.0});
+                // auto metricEvent = eventGroup.AddMetricEvent();
+                // metricEvent->SetName("arms_tag_entity");
+                // metricEvent->SetTagNoCopy("hostname", "");
+                // metricEvent->SetValue(UntypedSingleValue{1.0});
             }
         }
 
@@ -235,8 +238,12 @@ bool HostMetadataHandler::handle(uint32_t pluginIndex, std::vector<std::string>&
     std::vector<std::string> newContainerIds;
     std::vector<std::string> expiredContainerIds;
     std::unordered_set<std::string> newPodIps;
+    std::vector<std::string> addedContainers;
+    std::vector<std::string> removedContainers;
 
-    std::unordered_map<std::string, std::unique_ptr<SimplePodInfo>> newHostPods;
+    std::unordered_map<std::string, std::unique_ptr<SimplePodInfo>> currentHostPods;
+    std::unordered_set<std::string> currentContainers;
+    
 
     for (const auto& ip : podIpVec) {
         auto podInfo = K8sMetadata::GetInstance().GetInfoByIpFromCache(ip);
@@ -253,44 +260,46 @@ bool HostMetadataHandler::handle(uint32_t pluginIndex, std::vector<std::string>&
             podInfo->podIp, 
             podInfo->podName,
             podInfo->containerIds);
-        newHostPods[ip] = std::move(spi);
-        LOG_INFO(sLogger, ("appId", podInfo->appId) ("appName", podInfo->appName) ("podIp", podInfo->podIp) ("podName", podInfo->podName) (ip, "cannot fetch pod metadata or doesn't have arms label"));
+        currentHostPods[ip] = std::move(spi);
+        std::string cids;
+        for (auto& cid : podInfo->containerIds) {
+            cids += cid + ",";
+            currentContainers.insert(cid);
+            if (!mCids.count(cid)) {
+                // if cid doesn't exist in last cid set
+                addedContainers.push_back(cid);
+            }
+        }
+        LOG_INFO(sLogger, ("appId", podInfo->appId) ("appName", podInfo->appName) ("podIp", podInfo->podIp) ("podName", podInfo->podName) ("containerId", cids));
     }
 
     LOG_INFO(sLogger, ("begin to update local host metadata, pod list size:", newPodIps.size()) ("input pod list size", podIpVec.size()) ("host pod list size", mHostPods.size()));
-    
-    std::vector<std::string> addedPods;
-    std::vector<std::string> removedPods;
-    {
-        ReadLock lk(mLock);
-        for (const auto& [ip, _] : newHostPods) {
-            if (mHostPods.find(ip) == mHostPods.end()) {
-                addedPods.push_back(ip);
-            }
-        }
 
-        for (const auto& [ip, _] : mHostPods) {
-            if (newHostPods.find(ip) == newHostPods.end()) {
-                removedPods.push_back(ip);
-            }
+    for (auto& cid : mCids) {
+        if (!currentContainers.count(cid)) {
+            // if cid doesn't exist in current container ids list
+            removedContainers.push_back(cid);
         }
     }
+
+    // update cids ...
+    mCids = std::move(currentContainers);
 
     {
         WriteLock lk(mLock);
         // update cache ... 
-        mHostPods = std::move(newHostPods);
+        mHostPods = std::move(currentHostPods);
     }
 
     std::string addPodsStr;
-    for (auto& ip : addedPods) {
-        addPodsStr += ip;
+    for (auto& cid : addedContainers) {
+        addPodsStr += cid;
         addPodsStr += ",";
     }
 
     std::string removePodsStr;
-    for (auto& ip : removedPods) {
-        removePodsStr += ip;
+    for (auto& cid : removedContainers) {
+        removePodsStr += cid;
         removePodsStr += ",";
     }
 
@@ -299,9 +308,19 @@ bool HostMetadataHandler::handle(uint32_t pluginIndex, std::vector<std::string>&
         hostPodsStr += pod.first;
         hostPodsStr += ",";
     }
-
-    // TODO @qianlu.kk handle remove pods and add pods info ... 
-    LOG_INFO(sLogger, ("after update, self pod list size", mHostPods.size())("add cids", addPodsStr) ("remove cids", removePodsStr) ("host cids", hostPodsStr));
+    if (removedContainers.size() || addedContainers.size()) {
+        nami::ObserverNetworkOption ops;
+        ops.mDisableCids = removedContainers;
+        ops.mEnableCids = addedContainers;
+        ops.mEnableCidFilter = true;
+        bool ret = mUpdateFunc(nami::PluginType::NETWORK_OBSERVE, UpdataType::OBSERVER_UPDATE_TYPE_CHANGE_WHITELIST, &ops);
+        LOG_INFO(sLogger, ("after update, self pod list size", mHostPods.size()) 
+            ("add cids", addPodsStr) 
+            ("remove cids", removePodsStr) 
+            ("host pods ip", hostPodsStr) 
+            ("ret", ret) ("ops.mEnableCids.size", ops.mEnableCids.size()) ("ops.mDisableCids.size", ops.mDisableCids.size()));
+        return ret;
+    }    
 
     return true;
 }

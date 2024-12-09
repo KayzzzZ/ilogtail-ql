@@ -63,6 +63,12 @@
 #include "provider/Provider.h"
 #endif
 
+#include <gperftools/heap-profiler.h>
+#include <gperftools/profiler.h>
+DEFINE_FLAG_BOOL(enable_heap_profile, "", true);
+DEFINE_FLAG_BOOL(enable_cpu_profile, "", true);
+DEFINE_FLAG_INT32(profile_duration_seconds, "second", 180);
+
 DEFINE_FLAG_BOOL(ilogtail_disable_core, "disable core in worker process", true);
 DEFINE_FLAG_INT32(file_tags_update_interval, "second", 1);
 DEFINE_FLAG_INT32(config_scan_interval, "seconds", 10);
@@ -196,6 +202,25 @@ void Application::Init() {
 }
 
 void Application::Start() { // GCOVR_EXCL_START
+    if (BOOL_FLAG(enable_heap_profile)) {
+        HeapProfilerStart("heap");
+    }
+    if (BOOL_FLAG(enable_cpu_profile)) {
+        ProfilerStart("cpu.prof");
+    }
+    auto res = std::async(launch::async, []() {
+        while (true) {
+            this_thread::sleep_for(std::chrono::seconds(INT64_FLAG(profile_duration_seconds)));
+            if (BOOL_FLAG(enable_cpu_profile)) {
+                ProfilerFlush();
+            }
+            if (BOOL_FLAG(enable_heap_profile)) {
+                HeapProfilerDump("tmp");
+            }
+        }
+        ProfilerStop();
+        HeapProfilerStop();
+    });
     LogFileProfiler::mStartTime = GetTimeStamp(time(NULL), "%Y-%m-%d %H:%M:%S");
     LogtailMonitor::GetInstance()->UpdateConstMetric("start_time", LogFileProfiler::mStartTime);
 

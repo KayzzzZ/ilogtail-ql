@@ -57,6 +57,8 @@ enum class UpdataType {
   SECURE_UPDATE_TYPE_CONFIG_CHAGE,
   SECURE_UPDATE_TYPE_SUSPEND_PROBE,
   SECURE_UPDATE_TYPE_DISABLE_PROBE,
+  OBSERVER_UPDATE_TYPE_CHANGE_WHITELIST,
+  OBSERVER_UPDATE_TYPE_UPDATE_PROBE,
   SECURE_UPDATE_TYPE_MAX,
 };
 
@@ -199,6 +201,7 @@ struct ObserverNetworkOption {
     bool mEnableLog = true;
     bool mEnableCidFilter = true;
     std::vector<std::string> mEnableCids;
+    std::vector<std::string> mDisableCids;
     std::string mMeterHandlerType;
     std::string mSpanHandlerType;
 };

@@ -133,7 +133,7 @@ bool ContainerInfoIsExpired(std::shared_ptr<k8sContainerInfo> info) {
     return false;
 }
 
-bool K8sMetadata::FromContainerJson(const Json::Value& json, std::shared_ptr<ContainerData> data) {
+bool K8sMetadata::FromContainerJson(const Json::Value& json, std::shared_ptr<ContainerData> data, containerInfoType infoType) {
     if (!json.isObject()) {
         return false;
     }
@@ -142,6 +142,10 @@ bool K8sMetadata::FromContainerJson(const Json::Value& json, std::shared_ptr<Con
         bool fromJsonIsOk = FromInfoJson(json[key], info);
         if (!fromJsonIsOk) {
             continue;
+        }
+
+        if (infoType == containerInfoType::HostInfo) {
+            info.podIp = key;
         }
         data->containers[key] = info;
     }
@@ -218,7 +222,7 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
             if (data == nullptr) {
                 return false;
             }
-            if (!FromContainerJson(root, data)) {
+            if (!FromContainerJson(root, data, infoType)) {
                 LOG_WARNING(sLogger, ("from container json error:", "SetIpCache"));
             } else {
                 for (const auto& pair : data->containers) {
@@ -233,11 +237,11 @@ bool K8sMetadata::SendRequestToOperator(const std::string& urlHost,
                 }
             }
 
-            if (infoType == containerInfoType::ContainerIdInfo) {
-                SetContainerCache(root);
-            } else {
-                SetIpCache(root);
-            }
+            // if (infoType == containerInfoType::ContainerIdInfo) {
+            //     SetContainerCache(root);
+            // } else {
+            //     SetIpCache(root);
+            // }
         } else {
             LOG_WARNING(sLogger, ("JSON parse error:", errors));
             return false;
@@ -276,7 +280,7 @@ void K8sMetadata::SetContainerCache(const Json::Value& root) {
     if (data == nullptr) {
         return;
     }
-    if (!FromContainerJson(root, data)) {
+    if (!FromContainerJson(root, data, containerInfoType::ContainerIdInfo)) {
         LOG_DEBUG(sLogger, ("from container json error:", "SetContainerCache"));
     } else {
         for (const auto& pair : data->containers) {
@@ -290,7 +294,7 @@ void K8sMetadata::SetIpCache(const Json::Value& root) {
     if (data == nullptr) {
         return;
     }
-    if (!FromContainerJson(root, data)) {
+    if (!FromContainerJson(root, data, containerInfoType::IpInfo)) {
         LOG_DEBUG(sLogger, ("from container json error:", "SetIpCache"));
     } else {
         for (const auto& pair : data->containers) {

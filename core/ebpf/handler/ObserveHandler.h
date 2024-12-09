@@ -21,6 +21,7 @@
 
 #include "ebpf/handler/AbstractHandler.h"
 #include "ebpf/include/export.h"
+#include "ebpf/config.h"
 
 namespace logtail {
 namespace ebpf {
@@ -75,17 +76,22 @@ public:
 
 class HostMetadataHandler : public AbstractHandler {
 public:
+    using UpdatePluginCallbackFunc = std::function<bool(nami::PluginType, UpdataType updateType, const std::variant<SecurityOptions*, nami::ObserverNetworkOption*>)>;
     HostMetadataHandler(const logtail::PipelineContext* ctx, QueueKey key, uint32_t idx, int intervalSec = 60);
     ~HostMetadataHandler();
+    void RegisterUpdatePluginCallback(UpdatePluginCallbackFunc&& fn) { mUpdateFunc = fn; }
+    void DegisterUpdatePluginCallback() { mUpdateFunc = nullptr; }
     bool handle(uint32_t pluginIndex, std::vector<std::string>& podIpVec);
     void ReportAgentInfo();
 private:
     // key is podIp, value is cids
     std::unordered_map<std::string, std::unique_ptr<SimplePodInfo>> mHostPods;
+    std::unordered_set<std::string> mCids;
     std::thread mReporter;
     std::atomic_bool mFlag;
     ReadWriteLock mLock;
     int mIntervalSec;
+    UpdatePluginCallbackFunc mUpdateFunc = nullptr;
 };
 
 // #ifdef __ENTERPRISE__

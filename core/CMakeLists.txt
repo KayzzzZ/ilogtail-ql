@@ -92,7 +92,7 @@ if (ENABLE_COMPATIBLE_MODE)
 endif ()
 
 if (ANDROID OR CMAKE_BUILD_TYPE MATCHES Debug)
-    set(NO_TCMALLOC TRUE)
+    # set(NO_TCMALLOC TRUE)
     add_definitions(-DLOGTAIL_NO_TC_MALLOC)
 endif ()
 

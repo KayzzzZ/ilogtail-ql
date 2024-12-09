@@ -74,6 +74,8 @@ public:
                         const logtail::PipelineContext* ctx, 
                         const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options, std::shared_ptr<PluginMetricManager> mgr);
 
+    bool UpdatePlugin(nami::PluginType type, UpdataType updateType, const std::variant<SecurityOptions*, nami::ObserverNetworkOption*> options);
+
     bool DisablePlugin(const std::string& pipeline_name, nami::PluginType type);
 
     bool SuspendPlugin(const std::string& pipeline_name, nami::PluginType type);
