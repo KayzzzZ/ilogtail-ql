@@ -408,6 +408,21 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     } else if (telemetryType == "metrics") {
         mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
                                                                : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
+    } else if (telemetryType == "arms_agentinfo") {
+        mSubpath = "/apm/meta/arms/v1/meta_log/AgentInfo";
+        mLogstore = "__arms_default_agentinfo__";
+        mTelemetryType = sls_logs::ARMS_TELEMETRY_TYPE_AGENTINFO;
+        LOG_DEBUG(sLogger, ("successfully set subpath", mSubpath) ("logstore", mLogstore));
+    } else if (telemetryType == "arms_metrics") {
+        mSubpath = "/apm/metric/arms/v1/metric_log";
+        mLogstore = "__arms_default_metric__";
+        mTelemetryType = sls_logs::ARMS_TELEMETRY_TYPE_METRICS;
+        LOG_DEBUG(sLogger, ("successfully set subpath", mSubpath) ("logstore", mLogstore));
+    } else if (telemetryType == "arms_traces") {
+        mSubpath = "/apm/trace/arms/v1/trace_log";
+        mLogstore = "__arms_default_trace__";
+        mTelemetryType = sls_logs::ARMS_TELEMETRY_TYPE_TRACE;
+        LOG_DEBUG(sLogger, ("successfully set subpath", mSubpath) ("logstore", mLogstore));
     } else if (!telemetryType.empty() && telemetryType != "logs") {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
                               mContext->GetAlarm(),
@@ -605,6 +620,12 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
         if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
             req = sendClient->CreatePostMetricStoreLogsRequest(
                 mProject, data->mLogstore, ConvertCompressType(GetCompressType()), data->mData, data->mRawSize, item);
+        } else if (mTelemetryType == sls_logs::ARMS_TELEMETRY_TYPE_AGENTINFO) {
+
+        } else if (mTelemetryType == sls_logs::ARMS_TELEMETRY_TYPE_METRICS) {
+
+        } else if (mTelemetryType == sls_logs::ARMS_TELEMETRY_TYPE_TRACE) {
+
         } else {
             if (data->mShardHashKey.empty()) {
                 req = sendClient->CreatePostLogStoreLogsRequest(mProject,
