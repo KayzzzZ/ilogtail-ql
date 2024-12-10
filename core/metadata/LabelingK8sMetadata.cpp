@@ -26,6 +26,8 @@
 #include <boost/utility/string_view.hpp>
 #include "K8sMetadata.h"
 
+#include "constants/TagConstants.h"
+
 using logtail::StringView; 
 
 namespace logtail {
@@ -86,14 +88,13 @@ bool LabelingK8sMetadata::AddLabels(Event& e, std::vector<std::string>& containe
             containerVec.push_back(containerId);
             res = false;
         } else {
-            e.SetTag(workloadNameKey, containerInfo->workloadName);
-            e.SetTag(workloadKindKey, containerInfo->workloadKind);
-            e.SetTag(namespaceKey, containerInfo->k8sNamespace);
-            e.SetTag(serviceNameKey, containerInfo->serviceName);
-            e.SetTag(pidKey, containerInfo->appId);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_WORKLOAD_NAME, containerInfo->workloadName);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_WORKLOAD_KIND, containerInfo->workloadKind);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_NAMESPACE, containerInfo->k8sNamespace);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_SERVICE_NAME, containerInfo->serviceName);
         }
     }
-    StringView ipView(remoteIpKey);
+    StringView ipView(remoteIpKeyFromTag);
     StringView remoteIpView = e.HasTag(ipView) ? e.GetTag(ipView) : StringView{};
     if (!remoteIpView.empty()) {
         std::string remoteIp(remoteIpView);
@@ -102,9 +103,9 @@ bool LabelingK8sMetadata::AddLabels(Event& e, std::vector<std::string>& containe
             remoteIpVec.push_back(remoteIp);
             res = false;
         } else {
-            e.SetTag(peerWorkloadNameKey, ipInfo->workloadName);
-            e.SetTag(peerWorkloadKindKey, ipInfo->workloadKind);
-            e.SetTag(peerNamespaceKey, ipInfo->k8sNamespace);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_NAME, ipInfo->workloadName);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_WORKLOAD_KIND, ipInfo->workloadKind);
+            e.SetTag(DEFAULT_TRACE_TAG_K8S_PEER_NAMESPACE, ipInfo->k8sNamespace);
         }
     }
     return res;

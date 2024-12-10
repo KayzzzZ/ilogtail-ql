@@ -97,6 +97,7 @@ namespace logtail {
 
 ///////// TOBE MERGED TRACE /////////
     extern const std::string DEFAULT_TRACE_TAG_K8S_NAMESPACE;
+    extern const std::string DEFAULT_TRACE_TAG_K8S_PEER_NAMESPACE;
     extern const std::string DEFAULT_TRACE_TAG_K8S_POD_NAME;
     extern const std::string DEFAULT_TRACE_TAG_K8S_PEER_POD_NAME;
     extern const std::string DEFAULT_TRACE_TAG_K8S_POD_UID;

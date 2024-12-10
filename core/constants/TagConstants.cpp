@@ -109,6 +109,7 @@ namespace logtail {
 
 ///////// TOBE MERGED TRACE /////////
     const std::string DEFAULT_TRACE_TAG_K8S_NAMESPACE = "k8s.namespace.name";
+    const std::string DEFAULT_TRACE_TAG_K8S_PEER_NAMESPACE = "k8s.peer.namespace.name";
     const std::string DEFAULT_TRACE_TAG_K8S_POD_NAME = "k8s.pod.name";
     const std::string DEFAULT_TRACE_TAG_K8S_PEER_POD_NAME = "k8s.pod.name";
     const std::string DEFAULT_TRACE_TAG_K8S_POD_UID = "k8s.pod.uid";
