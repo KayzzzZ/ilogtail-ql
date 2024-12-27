@@ -127,7 +127,7 @@ set(SUB_DIRECTORIES_LIST
         protobuf/sls protobuf/models
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        ebpf ebpf/observer ebpf/security ebpf/handler
+        ebpf ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security ebpf/handler 
         parser
         )
 if (LINUX)
@@ -145,6 +145,7 @@ endif()
 
 # Module includes & set files.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
 
 foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${DIR_NAME})
@@ -221,6 +222,8 @@ endif ()
 # Generate independent libraries.
 add_subdirectory(go_pipeline)
 add_subdirectory(common)
+# Build eBPF dependencies
+add_subdirectory(ebpf/driver)
 
 # Link libraries.
 if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
