@@ -235,6 +235,61 @@ void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
     header[AUTHORIZATION] = LOG_HEADSIGNATURE_PREFIX + accessKeyId + ':' + signature;
 }
 
+void PreparePostAPMBackendRequest(const string& accessKeyId,
+                                    const string& accessKeySecret,
+                                    SLSClientManager::AuthType type,
+                                    const string& host,
+                                    bool isHostIp,
+                                    const string& project,
+                                    const string& logstore,
+                                    const string& compressType,
+                                    RawDataType dataType,
+                                    const string& body,
+                                    size_t rawSize,
+                                    const string& shardHashKey,
+                                    optional<uint64_t> seqId,
+                                    const string& path,
+                                    string& query,
+                                    map<string, string>& header) {
+
+    if (isHostIp) {
+        header[HOST] = project + "." + host;
+    } else {
+        header[HOST] = host;
+    }
+    header[USER_AGENT] = SLSClientManager::GetInstance()->GetUserAgent();
+    header[DATE] = GetDateString();
+    header[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
+    header[CONTENT_LENGTH] = to_string(body.size());
+    header[CONTENT_MD5] = CalcMD5(body);
+    header[X_LOG_APIVERSION] = LOG_API_VERSION;
+    header[X_LOG_SIGNATUREMETHOD] = HMAC_SHA1;
+    if (!compressType.empty()) {
+        header[X_LOG_COMPRESSTYPE] = compressType;
+    }
+    if (dataType == RawDataType::EVENT_GROUP) {
+        header[X_LOG_BODYRAWSIZE] = to_string(rawSize);
+    } else {
+        header[X_LOG_BODYRAWSIZE] = to_string(body.size());
+        header[X_LOG_MODE] = LOG_MODE_BATCH_GROUP;
+    }
+    if (type == SLSClientManager::AuthType::ANONYMOUS) {
+        header[X_LOG_KEYPROVIDER] = MD5_SHA1_SALT_KEYPROVIDER;
+    }
+
+    map<string, string> parameterList;
+    if (!shardHashKey.empty()) {
+        parameterList["key"] = shardHashKey;
+        if (seqId.has_value()) {
+            parameterList["seqid"] = to_string(seqId.value());
+        }
+    }
+    query = GetQueryString(parameterList);
+
+    string signature = GetUrlSignature(HTTP_POST, path, header, parameterList, body, accessKeySecret);
+    header[AUTHORIZATION] = LOG_HEADSIGNATURE_PREFIX + accessKeyId + ':' + signature;
+}
+
 SLSResponse PostLogStoreLogs(const string& accessKeyId,
                              const string& accessKeySecret,
                              SLSClientManager::AuthType type,
@@ -298,6 +353,43 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
                                       header);
     HttpResponse response;
     SendHttpRequest(make_unique<HttpRequest>(HTTP_POST, httpsFlag, host, httpsFlag ? 443 : 80, path, "", header, body),
+                    response);
+    return ParseHttpResponse(response);
+}
+
+SLSResponse PostAPMBackendLogs(const string& accessKeyId,
+                             const string& accessKeySecret,
+                             SLSClientManager::AuthType type,
+                             const string& host,
+                             bool httpsFlag,
+                             const string& project,
+                             const string& logstore,
+                             const string& compressType,
+                             RawDataType dataType,
+                             const string& body,
+                             size_t rawSize,
+                             const string& shardHashKey,
+                             const std::string& subpath) {
+    string query;
+    map<string, string> header;
+    PreparePostAPMBackendRequest(accessKeyId,
+                                   accessKeySecret,
+                                   type,
+                                   host,
+                                   false, // sync request always uses vip
+                                   project,
+                                   logstore,
+                                   compressType,
+                                   dataType,
+                                   body,
+                                   rawSize,
+                                   shardHashKey,
+                                   nullopt, // sync request does not support exactly-once
+                                   subpath,
+                                   query,
+                                   header);
+    HttpResponse response;
+    SendHttpRequest(make_unique<HttpRequest>(HTTP_POST, httpsFlag, host, httpsFlag ? 443 : 80, subpath, "", header, body),
                     response);
     return ParseHttpResponse(response);
 }
