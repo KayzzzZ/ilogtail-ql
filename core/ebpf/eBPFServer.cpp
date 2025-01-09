@@ -486,14 +486,20 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
             "87f79be5ab74d72b4a10b62c02dc7f34", 
             "1796627f8e0b7fbba042c145820311f9"
         };
+        std::vector<std::string> app_names = {
+            "test-service-1", 
+            "test-service-2", 
+            "test-service-3", 
+            "test-service-4", 
+            "test-service-5"
+        };
         for (size_t i = 0; i < app_ids.size(); i ++) {
             std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
             mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
-            mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
-            mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.55");
+            mTestEventGroup.SetTag(std::string("serverIp"), "10.54.0.55");
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
-            mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            mTestEventGroup.SetTag(std::string("service"), app_names[i]);
             mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
             for (size_t j = 0 ; j < app_metric_names.size(); j ++) {
                 for (size_t z = 0; z < 10; z ++ ) {
@@ -509,7 +515,7 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
                     metricsEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
                     metricsEvent->SetName(app_metric_names[j]);
                     metricsEvent->SetValue(UntypedSingleValue{10.0});
-                    metricsEvent->SetTimestamp(seconds);
+                    metricsEvent->SetTimestamp(seconds, 0);
                 }
             }
             std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(mTestEventGroup), idx);
@@ -520,10 +526,9 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
             std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
             mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
-            mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
-            mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.44");
+            mTestEventGroup.SetTag(std::string("serverIp"), "10.54.0.44");
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
-            mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            mTestEventGroup.SetTag(std::string("service"), app_names[i]);
             mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
             for (size_t j = 0 ; j < tcp_metrics_names.size(); j ++) {
                 for (size_t z = 0; z < 20; z ++ ) {
@@ -536,7 +541,7 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
                     metricsEvent->SetTag(std::string("dest_ip"), std::string("10.54.0." + std::to_string(z)));
                     metricsEvent->SetTag(std::string("callType"), std::string("conn_stats"));
                     metricsEvent->SetValue(UntypedSingleValue{20.0});
-                    metricsEvent->SetTimestamp(seconds);
+                    metricsEvent->SetTimestamp(seconds, 0);
                 }
             }
             std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(mTestEventGroup), idx);
@@ -596,11 +601,10 @@ void eBPFServer::GenerateSpan(logtail::QueueKey key, uint32_t idx) {
         for (size_t i = 0; i < app_ids.size(); i ++) {
             std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
-            mTestEventGroup.SetTag(std::string("serviceName"), service_name[i]);
-            mTestEventGroup.SetTag(std::string("appId"), std::string(app_ids[i]));
-            mTestEventGroup.SetTag(std::string("source_ip"), "10.54.0.55");
-            mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
-            mTestEventGroup.SetTag(std::string("appType"), std::string("EBPF"));
+            mTestEventGroup.SetTag(std::string("service.name"), service_name[i]);
+            mTestEventGroup.SetTag(std::string("arms.appId"), std::string(app_ids[i]));
+            mTestEventGroup.SetTag(std::string("host.ip"), "10.54.0.55");
+            mTestEventGroup.SetTag(std::string("arms.app.type"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("data_type"), std::string("trace"));
             for (size_t j = 0 ; j < 25; j ++) {
                 auto spanEvent = mTestEventGroup.AddSpanEvent();
