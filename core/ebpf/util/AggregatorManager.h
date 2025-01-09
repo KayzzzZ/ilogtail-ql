@@ -52,26 +52,26 @@ private:
 template <typename T, typename D, typename FlushType>
 class AggregatorManager {
 public:
-    AggregatorManager(size_t max_nodes,
-            const std::function<void(std::unique_ptr<Data> &, const Value &)> &aggregate, 
-            const std::function<std::unique_ptr<Data>(const Value &n)> &generate, int interval_sec) 
-            : mTree(max_nodes, aggregate, generate), mIntervalSec(interval_sec) {}
+    // AggregatorManager(size_t max_nodes,
+    //         const std::function<void(std::unique_ptr<Data> &, const Value &)> &aggregate, 
+    //         const std::function<std::unique_ptr<Data>(const Value &n)> &generate, int interval_sec) 
+    //         : mTree(max_nodes, aggregate, generate), mIntervalSec(interval_sec) {}
 
     ~AggregatorManager();
 
-    void Init() {
-        mTimer.PushEvent(std::make_unique<FixedInvervalEvent>(mIntervalSec, [&]() {
-            // mTree.NodeCount();
-            // 1. generate measurebatch ==> eventgroup
-            // 2. push to process queue ... 
-            // 3. swap agg tree
-            mTimer.PushEvent();
-        }));
-    }
+    // void Init() {
+    //     mTimer.PushEvent(std::make_unique<FixedInvervalEvent>(mIntervalSec, [&]() {
+    //         // mTree.NodeCount();
+    //         // 1. generate measurebatch ==> eventgroup
+    //         // 2. push eventgroup to process queue ... 
+    //         // 3. swap agg tree
+    //         mTimer.PushEvent();
+    //     }));
+    // }
     
-    void Aggregate(const std::array<size_t, nami::MaxAggregationLevel>& key, const D& value) {
-        mTree.Aggregate(key, value);
-    }
+    // void Aggregate(const std::array<size_t, nami::MaxAggregationLevel>& key, const D& value) {
+    //     mTree.Aggregate(key, value);
+    // }
 
     void Flush() {
         

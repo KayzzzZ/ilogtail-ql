@@ -263,7 +263,7 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
                     request->mResponse.SetResponseTime(responseTimeMs);
                     LOG_DEBUG(sLogger,
                               ("send http request succeeded, item address",
-                               request->mItem)("config-flusher-dst",
+                               request->mItem)("req.url", request->mUrl)("req.host", request->mHost)("config-flusher-dst",
                                                QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))(
                                   "response time", ToString(responseTimeMs.count()) + "ms")("try cnt",
                                                                                             ToString(request->mTryCnt))(

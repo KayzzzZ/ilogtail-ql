@@ -294,16 +294,57 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                            mContext->GetRegion());
     }
 
+    // TelemetryType
+    string telemetryType;
+    if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              "logs",
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    } else if (telemetryType == "metrics") {
+        mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
+                                                               : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
+    } else if (telemetryType == "arms_agentinfo") {
+        mSubpath = APM_AGENTINFOS_URL;
+        mLogstore = DUMMY_LOG_STORE;
+        mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS;
+    } else if (telemetryType == "arms_metrics") {
+        mSubpath = APM_METRICS_URL;
+        mLogstore = DUMMY_LOG_STORE;
+        mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS;
+    } else if (telemetryType == "arms_traces") {
+        mSubpath = APM_TRACES_URL;
+        mLogstore = DUMMY_LOG_STORE;
+        mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES;
+    } else if (!telemetryType.empty() && telemetryType != "logs") {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              "string param TelemetryType is not valid",
+                              "logs",
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
     // Logstore
-    if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           errorMsg,
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
+    if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_LOGS) {
+        if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                            mContext->GetAlarm(),
+                            errorMsg,
+                            sName,
+                            mContext->GetConfigName(),
+                            mContext->GetProjectName(),
+                            mContext->GetLogstoreName(),
+                            mContext->GetRegion());
+        }
     }
 
     // Region
@@ -409,32 +450,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
 #endif
 
-    // TelemetryType
-    string telemetryType;
-    if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              "logs",
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
-    } else if (telemetryType == "metrics") {
-        mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
-                                                               : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
-    } else if (!telemetryType.empty() && telemetryType != "logs") {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              "string param TelemetryType is not valid",
-                              "logs",
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
-    }
+    
 
     // Batch
     const char* key = "Batch";
@@ -652,6 +668,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
         return false;
     }
 #else
+    LOG_DEBUG(sLogger, ("project", mProject) ("endpoint", mEndpoint));
     static string host = mProject + "." + mEndpoint;
     data->mCurrentHost = host;
 #endif
@@ -662,6 +679,11 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
             break;
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
             req = CreatePostMetricStoreLogsRequest(accessKeyId, accessKeySecret, type, data);
+            break;
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
+            req = CreatePostArmsBackendRequest(accessKeyId, accessKeySecret, type, data, mSubpath);
             break;
         default:
             break;
@@ -689,7 +711,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         }
         LOG_DEBUG(
             sLogger,
-            ("send data to sls succeeded, item address", item)("request id", slsResponse.mRequestId)(
+            ("send data to sls succeeded, item address", item)("item subpath", data->mSupath)("flusher subpath", mSubpath)("request id", slsResponse.mRequestId)(
                 "config", configName)("region", mRegion)("project", mProject)("logstore", data->mLogstore)(
                 "response time",
                 ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mLastSendTime).count())
@@ -1013,6 +1035,7 @@ bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
 }
 
 bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
+    LOG_INFO(sLogger, ("group list size", groupList.size()));
     if (groupList.empty()) {
         return true;
     }
@@ -1079,6 +1102,7 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
                                                                   std::move(group.mExactlyOnceCheckpoint),
                                                                   false))
                     && allSucceeded;
+                LOG_INFO(sLogger, ("all succeed", allSucceeded));
             } else {
                 allSucceeded = Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(std::move(compressedData),
                                                                                     serializedData.size(),
@@ -1088,6 +1112,7 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
                                                                                     RawDataType::EVENT_GROUP,
                                                                                     shardHashKey))
                     && allSucceeded;
+                LOG_INFO(sLogger, ("all succeed", allSucceeded));
             }
         }
     }
@@ -1098,6 +1123,7 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
             = Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(
                   std::move(serializedData), packageSize, this, mQueueKey, mLogstore, RawDataType::EVENT_GROUP_LIST))
             && allSucceeded;
+        LOG_INFO(sLogger, ("all succeed", allSucceeded));
     }
     return allSucceeded;
 }
@@ -1233,6 +1259,49 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                         item->mCurrentHost,
                                         httpsFlag ? 443 : 80,
                                         path,
+                                        "",
+                                        header,
+                                        item->mData,
+                                        item,
+                                        INT32_FLAG(default_http_request_timeout_sec),
+                                        1);
+}
+
+unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostArmsBackendRequest(const string& accessKeyId,
+                                                                         const string& accessKeySecret,
+                                                                         SLSClientManager::AuthType type,
+                                                                         SLSSenderQueueItem* item,
+                                                                         const std::string& subPath) const {
+    
+    optional<uint64_t> seqId;
+    if (item->mExactlyOnceCheckpoint) {
+        seqId = item->mExactlyOnceCheckpoint->data.sequence_id();
+    }
+    item->mSupath = subPath;
+    string query;
+    map<string, string> header;
+    PreparePostAPMBackendRequest(accessKeyId,
+                                   accessKeySecret,
+                                   type,
+                                   item->mCurrentHost,
+                                   item->mRealIpFlag,
+                                   mProject,
+                                   item->mLogstore,
+                                   CompressTypeToString(mCompressor->GetCompressType()),
+                                   item->mType,
+                                   item->mData,
+                                   item->mRawSize,
+                                   item->mShardHashKey,
+                                   seqId,
+                                   mSubpath,
+                                   query,
+                                   header);
+    bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
+    return make_unique<HttpSinkRequest>(HTTP_POST,
+                                        httpsFlag,
+                                        item->mCurrentHost,
+                                        httpsFlag ? 443 : 80,
+                                        subPath,
                                         "",
                                         header,
                                         item->mData,

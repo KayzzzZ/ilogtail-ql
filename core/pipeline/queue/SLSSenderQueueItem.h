@@ -35,6 +35,7 @@ struct SLSSenderQueueItem : public SenderQueueItem {
     std::string mCurrentHost;
     bool mRealIpFlag = false;
     int32_t mLastLogWarningTime = 0; // temporaily used
+    std::string mSupath;
 
     SLSSenderQueueItem(std::string&& data,
                        size_t rawSize,

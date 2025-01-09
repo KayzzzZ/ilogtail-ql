@@ -89,6 +89,10 @@ public:
 
     std::string GetAllProjects();
 
+    void GenerateMetric(logtail::QueueKey key, uint32_t idx);
+    void GenerateSpan(logtail::QueueKey key, uint32_t idx);
+    void GenerateAgentInfo(logtail::QueueKey key, uint32_t idx);
+
 private:
     bool StartPluginInternal(const std::string& pipeline_name,
                              uint32_t plugin_index,
@@ -127,6 +131,11 @@ private:
     // hold some managers ...
     std::unique_ptr<BaseManager> mBaseManager;
     std::array<std::shared_ptr<AbstractManager>, static_cast<size_t>(PluginType::MAX)> mPlugins = {};
+
+    std::thread mMetricMockThread;
+    std::thread mLogMockThread;
+    std::thread mTraceMockThread;
+    std::atomic_bool mGenerateFlag = false;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
