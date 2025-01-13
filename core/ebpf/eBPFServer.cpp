@@ -27,9 +27,9 @@
 #include "ebpf/Config.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
+#include "metadata/K8sMetadata.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
-#include "metadata/K8sMetadata.h"
 
 DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
@@ -42,19 +42,19 @@ static const uint16_t KERNEL_VERSION_310 = 3010; // for centos7
 static const std::string KERNEL_NAME_CENTOS = "CentOS";
 static const uint16_t KERNEL_CENTOS_MIN_VERSION = 7006;
 
-bool EnvManager::IsSupportedEnv(logtail::ebpf::PluginType type) {
+bool EnvManager::IsSupportedEnv(PluginType type) {
     if (!mInited) {
         LOG_ERROR(sLogger, ("env manager not inited ...", ""));
         return false;
     }
     bool status = false;
     switch (type) {
-        case logtail::ebpf::PluginType::NETWORK_OBSERVE:
+        case PluginType::NETWORK_OBSERVE:
             status = mArchSupport && (mBTFSupport || m310Support);
             break;
-        case logtail::ebpf::PluginType::FILE_SECURITY:
-        case logtail::ebpf::PluginType::NETWORK_SECURITY:
-        case logtail::ebpf::PluginType::PROCESS_SECURITY: {
+        case PluginType::FILE_SECURITY:
+        case PluginType::NETWORK_SECURITY:
+        case PluginType::PROCESS_SECURITY: {
             status = mArchSupport && mBTFSupport;
             break;
         }
@@ -134,7 +134,7 @@ void EnvManager::InitEnvInfo() {
     m310Support = false;
 }
 
-bool eBPFServer::IsSupportedEnv(logtail::ebpf::PluginType type) {
+bool eBPFServer::IsSupportedEnv(PluginType type) {
     return mEnvMgr.IsSupportedEnv(type);
 }
 
@@ -189,8 +189,8 @@ void eBPFServer::Stop() {
     // destroy source manager
     // do not destroy source manager ...
     // mSourceManager.reset();
-    for (int i = 0; i < int(logtail::ebpf::PluginType::MAX); i++) {
-        UpdatePipelineName(static_cast<logtail::ebpf::PluginType>(i), "", "");
+    for (int i = 0; i < int(PluginType::MAX); i++) {
+        UpdatePipelineName(static_cast<PluginType>(i), "", "");
     }
 
     // UpdateContext must after than StopPlugin
@@ -208,13 +208,14 @@ void eBPFServer::Stop() {
         mFileSecureCB->UpdateContext(nullptr, -1, -1);
 }
 
-// maybe update or create 
-bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
-                                     uint32_t plugin_index,
-                                     logtail::ebpf::PluginType type,
-                                     const logtail::PipelineContext* ctx,
-                                     const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options,
-                                     PluginMetricManagerPtr mgr) {
+// maybe update or create
+bool eBPFServer::StartPluginInternal(
+    const std::string& pipeline_name,
+    uint32_t plugin_index,
+    PluginType type,
+    const logtail::PipelineContext* ctx,
+    const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
+    PluginMetricManagerPtr mgr) {
     std::string prev_pipeline_name = CheckLoadedPipelineName(type);
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
         LOG_WARNING(sLogger,
@@ -230,13 +231,13 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
 
     // step1: convert options to export type
     bool ret = false;
-    auto eBPFConfig = std::make_unique<logtail::ebpf::PluginConfig>();
+    auto eBPFConfig = std::make_unique<PluginConfig>();
     eBPFConfig->mPluginType = type;
     // call update function
     // step2: call init function
     switch (type) {
-        case logtail::ebpf::PluginType::PROCESS_SECURITY: {
-            logtail::ebpf::ProcessConfig pconfig;
+        case PluginType::PROCESS_SECURITY: {
+            ProcessConfig pconfig;
             // TODO @qianlu.kk set new handler ...
 
             // pconfig.process_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
@@ -251,27 +252,24 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             break;
         }
 
-        case logtail::ebpf::PluginType::NETWORK_OBSERVE: {
-            logtail::ebpf::NetworkObserveConfig nconfig;
+        case PluginType::NETWORK_OBSERVE: {
+            NetworkObserveConfig nconfig;
 
             // TODO @qianlu.kk register k8s metadata callback for metric ??
-            
+
             mEventCB->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
             auto idx = static_cast<int>(PluginType::NETWORK_OBSERVE);
             mPlugins[idx] = NetworkObserverManager::Create(
-                mBaseManager, 
-                mSourceManager, 
-                [&](const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
+                mBaseManager, mSourceManager, [&](const std::vector<std::unique_ptr<ApplicationBatchEvent>>& events) {
                     mEventCB->handle(events);
-                }
-            );
+                });
 
             ret = (mPlugins[idx]->Init(options) == 0);
             break;
         }
 
-        case logtail::ebpf::PluginType::NETWORK_SECURITY: {
-            logtail::ebpf::NetworkSecurityConfig nconfig;
+        case PluginType::NETWORK_SECURITY: {
+            NetworkSecurityConfig nconfig;
             // TODO @qianlu.kk set new handler ...
 
             // nconfig.network_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
@@ -286,8 +284,8 @@ bool eBPFServer::StartPluginInternal(const std::string& pipeline_name,
             break;
         }
 
-        case logtail::ebpf::PluginType::FILE_SECURITY: {
-            logtail::ebpf::FileSecurityConfig fconfig;
+        case PluginType::FILE_SECURITY: {
+            FileSecurityConfig fconfig;
             // TODO @qianlu.kk set new handler ...
 
             // fconfig.file_security_cb_ = [this](std::vector<std::unique_ptr<AbstractSecurityEvent>>& events) {
@@ -324,9 +322,9 @@ bool eBPFServer::HasRegisteredPlugins() const {
 
 bool eBPFServer::EnablePlugin(const std::string& pipeline_name,
                               uint32_t plugin_index,
-                              logtail::ebpf::PluginType type,
+                              PluginType type,
                               const PipelineContext* ctx,
-                              const std::variant<SecurityOptions*, logtail::ebpf::ObserverNetworkOption*> options,
+                              const std::variant<SecurityOptions*, ObserverNetworkOption*> options,
                               PluginMetricManagerPtr mgr) {
     if (!IsSupportedEnv(type)) {
         return false;
@@ -334,7 +332,7 @@ bool eBPFServer::EnablePlugin(const std::string& pipeline_name,
     return StartPluginInternal(pipeline_name, plugin_index, type, ctx, options, mgr);
 }
 
-bool eBPFServer::DisablePlugin(const std::string& pipeline_name, logtail::ebpf::PluginType type) {
+bool eBPFServer::DisablePlugin(const std::string& pipeline_name, PluginType type) {
     if (!IsSupportedEnv(type)) {
         return true;
     }
@@ -354,7 +352,7 @@ bool eBPFServer::DisablePlugin(const std::string& pipeline_name, logtail::ebpf::
     return ret;
 }
 
-std::string eBPFServer::CheckLoadedPipelineName(logtail::ebpf::PluginType type) {
+std::string eBPFServer::CheckLoadedPipelineName(PluginType type) {
     std::lock_guard<std::mutex> lk(mMtx);
     return mLoadedPipeline[int(type)];
 }
@@ -362,7 +360,7 @@ std::string eBPFServer::CheckLoadedPipelineName(logtail::ebpf::PluginType type) 
 std::string eBPFServer::GetAllProjects() {
     std::lock_guard<std::mutex> lk(mMtx);
     std::string res;
-    for (int i = 0; i < int(logtail::ebpf::PluginType::MAX); i++) {
+    for (int i = 0; i < int(PluginType::MAX); i++) {
         if (mPluginProject[i] != "") {
             res += mPluginProject[i];
             res += " ";
@@ -371,14 +369,16 @@ std::string eBPFServer::GetAllProjects() {
     return res;
 }
 
-void eBPFServer::UpdatePipelineName(logtail::ebpf::PluginType type, const std::string& name, const std::string& project) {
+void eBPFServer::UpdatePipelineName(PluginType type,
+                                    const std::string& name,
+                                    const std::string& project) {
     std::lock_guard<std::mutex> lk(mMtx);
     mLoadedPipeline[int(type)] = name;
     mPluginProject[int(type)] = project;
     return;
 }
 
-bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, logtail::ebpf::PluginType type) {
+bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, PluginType type) {
     if (!IsSupportedEnv(type)) {
         return false;
     }
@@ -391,17 +391,17 @@ bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, logtail::ebpf::
     return ret;
 }
 
-void eBPFServer::UpdateCBContext(logtail::ebpf::PluginType type,
+void eBPFServer::UpdateCBContext(PluginType type,
                                  const logtail::PipelineContext* ctx,
                                  logtail::QueueKey key,
                                  int idx) {
     switch (type) {
-        case logtail::ebpf::PluginType::PROCESS_SECURITY: {
+        case PluginType::PROCESS_SECURITY: {
             if (mProcessSecureCB)
                 mProcessSecureCB->UpdateContext(ctx, key, idx);
             return;
         }
-        case logtail::ebpf::PluginType::NETWORK_OBSERVE: {
+        case PluginType::NETWORK_OBSERVE: {
             if (mMeterCB)
                 mMeterCB->UpdateContext(ctx, key, idx);
             if (mSpanCB)
@@ -410,12 +410,12 @@ void eBPFServer::UpdateCBContext(logtail::ebpf::PluginType type,
                 mEventCB->UpdateContext(ctx, key, idx);
             return;
         }
-        case logtail::ebpf::PluginType::NETWORK_SECURITY: {
+        case PluginType::NETWORK_SECURITY: {
             if (mNetworkSecureCB)
                 mNetworkSecureCB->UpdateContext(ctx, key, idx);
             return;
         }
-        case logtail::ebpf::PluginType::FILE_SECURITY: {
+        case PluginType::FILE_SECURITY: {
             if (mFileSecureCB)
                 mFileSecureCB->UpdateContext(ctx, key, idx);
             return;
