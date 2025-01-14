@@ -480,43 +480,100 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
         // construct vector<PipelineEventGroup>
         // 1000 timeseries for app
         std::vector<std::string> app_ids = {
-            "eeeb8df999f59f569da84d27fa408a94", 
-            "deddf8ef215107d8fd37540ac4e3291b", 
-            "52abe1564d8ee3fea66e9302fc21d80d", 
-            "87f79be5ab74d72b4a10b62c02dc7f34", 
-            "1796627f8e0b7fbba042c145820311f9"
+            "6424c56cdaa1e5639d298e858c92d107", 
+            // "deddf8ef215107d8fd37540ac4e3291b", 
+            // "52abe1564d8ee3fea66e9302fc21d80d", 
+            // "87f79be5ab74d72b4a10b62c02dc7f34", 
+            // "1796627f8e0b7fbba042c145820311f9"
         };
         std::vector<std::string> app_names = {
-            "test-service-1", 
-            "test-service-2", 
-            "test-service-3", 
-            "test-service-4", 
-            "test-service-5"
+            "ql-test-cp", 
+            // "test-service-2", 
+            // "test-service-3", 
+            // "test-service-4", 
+            // "test-service-5"
         };
+
         for (size_t i = 0; i < app_ids.size(); i ++) {
             std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
             mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
-            mTestEventGroup.SetTag(std::string("serverIp"), "10.54.0.55");
+            mTestEventGroup.SetTag(std::string("serverIp"), "10.28.197.177");
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("service"), app_names[i]);
             mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
+
+            // set tag entity
+            auto* evt = mTestEventGroup.AddMetricEvent();
+            evt->SetTag(std::string("agentVersion"), std::string("v1"));
+            evt->SetTag(std::string("app"), app_names[i]); // workloadname
+            evt->SetTag(std::string("resourceid"), app_ids[i]);
+            evt->SetTag(std::string("resourcetype"), std::string("APPLICATION"));
+            evt->SetTag(std::string("version"), std::string("v1"));
+            evt->SetTag(std::string("clusterId"), std::string("c0748d004a7ce431d8da62ed8f6134879"));
+            evt->SetTag(std::string("host"), std::string("10.28.197.177"));
+            evt->SetTag(std::string("hostname"), std::string("continuous-profiling-5d7b7fd458-tkn2n"));
+            evt->SetTag(std::string("namespace"), std::string("arms-apm-demo"));
+            evt->SetTag(std::string("workloadKind"), std::string("Deployment"));
+            evt->SetTag(std::string("workloadName"), std::string("continuous-profiling"));
+            evt->SetName("arms_tag_entity");
+            evt->SetValue(UntypedSingleValue{1.0});
+            evt->SetTimestamp(seconds, 0);
+
             for (size_t j = 0 ; j < app_metric_names.size(); j ++) {
-                for (size_t z = 0; z < 10; z ++ ) {
+                for (size_t z = 0; z < 25; z ++ ) {
+                    if (app_metric_names[j] == "arms_rpc_requests_error_count") {
+                        if (z % 5) {
+                            continue;
+                        }
+                    }
+                    if (app_metric_names[j] == "arms_rpc_requests_slow_count") {
+                        if (z % 4) {
+                            continue;
+                        }
+                    }
                     auto metricsEvent = mTestEventGroup.AddMetricEvent();
-                    metricsEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
-                    metricsEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
-                    metricsEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
-                    metricsEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
-                    metricsEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local" + std::to_string(z)));
+                    metricsEvent->SetTag(std::string("workloadName"), std::string("continuous-profiling"));
+                    metricsEvent->SetTag(std::string("workloadKind"), std::string("Deployment"));
+                    // metricsEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
+                    metricsEvent->SetTag(std::string("host"), std::string("continuous-profiling-5d7b7fd458-tkn2n"));
+                    metricsEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/20250113/" + std::to_string(z)));
                     metricsEvent->SetTag(std::string("rpcType"), std::string("0"));
                     metricsEvent->SetTag(std::string("callType"), std::string("http"));
-                    metricsEvent->SetTag(std::string("statusCode"), std::string("200"));
+                    metricsEvent->SetTag(std::string("callKind"), std::string("http"));
+                    metricsEvent->SetTag(std::string("status"), std::string("200"));
                     metricsEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
                     metricsEvent->SetName(app_metric_names[j]);
                     metricsEvent->SetValue(UntypedSingleValue{10.0});
+                    
+                    if (app_metric_names[j] == "arms_rpc_requests_seconds") {
+                        if (z % 4) {
+                            metricsEvent->SetValue(UntypedSingleValue{0.2});
+                        } else {
+                            metricsEvent->SetValue(UntypedSingleValue{2});
+                        }
+                        
+                    } else {
+                        metricsEvent->SetValue(UntypedSingleValue{10.0});
+                    }
                     metricsEvent->SetTimestamp(seconds, 0);
                 }
+                // for client metric
+                auto clientMetric = mTestEventGroup.AddMetricEvent();
+                clientMetric->SetTag(std::string("workloadName"), std::string("continuous-profiling"));
+                clientMetric->SetTag(std::string("workloadKind"), std::string("Deployment"));
+                clientMetric->SetTag(std::string("host"), std::string("continuous-profiling-5d7b7fd458-tkn2n"));
+                clientMetric->SetTag(std::string("rpc"), std::string("/mysql/exec"));
+                clientMetric->SetTag(std::string("rpcType"), std::string("25"));
+                clientMetric->SetTag(std::string("callType"), std::string("http_client"));
+                clientMetric->SetTag(std::string("callKind"), std::string("http_client"));
+                clientMetric->SetTag(std::string("status"), std::string("200"));
+                clientMetric->SetTag(std::string("version"), std::string("HTTP1.1"));
+                clientMetric->SetTag(std::string("destId"), std::string("10.28.197.190")); // ip
+                clientMetric->SetTag(std::string("endpoint"), std::string("/mysql/exec"));
+                clientMetric->SetName(app_metric_names[j]);
+                clientMetric->SetValue(UntypedSingleValue{10.0});
+                clientMetric->SetTimestamp(seconds, 0);
             }
             std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(mTestEventGroup), idx);
             items.emplace_back(std::move(item));
@@ -526,7 +583,7 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
             std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
             mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
-            mTestEventGroup.SetTag(std::string("serverIp"), "10.54.0.44");
+            mTestEventGroup.SetTag(std::string("serverIp"), "10.28.197.177");
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("service"), app_names[i]);
             mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
@@ -534,10 +591,10 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
                 for (size_t z = 0; z < 20; z ++ ) {
                     auto metricsEvent = mTestEventGroup.AddMetricEvent();
                     metricsEvent->SetName(tcp_metrics_names[j]);
-                    metricsEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
-                    metricsEvent->SetTag(std::string("workloadKind"), std::string("qianlu"));
-                    metricsEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
-                    metricsEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
+                    metricsEvent->SetTag(std::string("workloadName"), std::string("continuous-profiling"));
+                    metricsEvent->SetTag(std::string("workloadKind"), std::string("Deployment"));
+                    metricsEvent->SetTag(std::string("source_ip"), std::string("10.28.197.177"));
+                    metricsEvent->SetTag(std::string("host"), std::string("continuous-profiling-5d7b7fd458-tkn2n"));
                     metricsEvent->SetTag(std::string("dest_ip"), std::string("10.54.0." + std::to_string(z)));
                     metricsEvent->SetTag(std::string("callType"), std::string("conn_stats"));
                     metricsEvent->SetValue(UntypedSingleValue{20.0});
@@ -585,40 +642,41 @@ void eBPFServer::GenerateSpan(logtail::QueueKey key, uint32_t idx) {
         // construct vector<PipelineEventGroup>
         // 1000 timeseries for app
         std::vector<std::string> app_ids = {
-            "eeeb8df999f59f569da84d27fa408a94", 
-            "deddf8ef215107d8fd37540ac4e3291b", 
-            "52abe1564d8ee3fea66e9302fc21d80d", 
-            "87f79be5ab74d72b4a10b62c02dc7f34", 
-            "1796627f8e0b7fbba042c145820311f9"
+            "6424c56cdaa1e5639d298e858c92d107", 
+            // "deddf8ef215107d8fd37540ac4e3291b", 
+            // "52abe1564d8ee3fea66e9302fc21d80d", 
+            // "87f79be5ab74d72b4a10b62c02dc7f34", 
+            // "1796627f8e0b7fbba042c145820311f9"
         };
         std::vector<std::string> service_name = {
-            "test-service-1",
-            "test-service-2",
-            "test-service-3",
-            "test-service-4",
-            "test-service-5"
+            "ql-test-cp",
+            // "test-service-2",
+            // "test-service-3",
+            // "test-service-4",
+            // "test-service-5"
         };
+
         for (size_t i = 0; i < app_ids.size(); i ++) {
             std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
             mTestEventGroup.SetTag(std::string("service.name"), service_name[i]);
             mTestEventGroup.SetTag(std::string("arms.appId"), std::string(app_ids[i]));
-            mTestEventGroup.SetTag(std::string("host.ip"), "10.54.0.55");
+            mTestEventGroup.SetTag(std::string("host.ip"), "10.28.197.177");
             mTestEventGroup.SetTag(std::string("arms.app.type"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("data_type"), std::string("trace"));
             for (size_t j = 0 ; j < 25; j ++) {
                 auto spanEvent = mTestEventGroup.AddSpanEvent();
                 // spanEvent->SetScopeTag();
-                spanEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
-                spanEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
-                spanEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
-                spanEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
-                spanEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/" + std::to_string(j)));
+                spanEvent->SetTag(std::string("workloadName"), std::string("continuous-profiling"));
+                spanEvent->SetTag(std::string("workloadKind"), std::string("Deployment"));
+                spanEvent->SetTag(std::string("source_ip"), std::string("10.28.197.177"));
+                spanEvent->SetTag(std::string("host"), std::string("continuous-profiling-5d7b7fd458-tkn2n"));
+                spanEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/20250113" + std::to_string(j)));
                 spanEvent->SetTag(std::string("rpcType"), std::string("0"));
                 spanEvent->SetTag(std::string("callType"), std::string("http"));
                 spanEvent->SetTag(std::string("statusCode"), std::string("200"));
                 spanEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
-                spanEvent->SetName("/oneagent/qianlu/local/" + std::to_string(j));
+                spanEvent->SetName("/oneagent/qianlu/local/20250113/" + std::to_string(j));
                 spanEvent->SetKind(SpanEvent::Kind::Server);
                 std::string trace_id = GenerateRandomString(32);
                 std::string span_id = GenerateRandomString(16);
@@ -631,16 +689,16 @@ void eBPFServer::GenerateSpan(logtail::QueueKey key, uint32_t idx) {
             }
             for (size_t j = 0 ; j < 25; j ++) {
                 auto spanEvent = mTestEventGroup.AddSpanEvent();
-                spanEvent->SetTag(std::string("workloadName"), std::string("arms-oneagent-test-ql"));
-                spanEvent->SetTag(std::string("workloadKind"), std::string("faceless"));
-                spanEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
-                spanEvent->SetTag(std::string("host"), std::string("10.54.0.33"));
-                spanEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/" + std::to_string(j)));
+                spanEvent->SetTag(std::string("workloadName"), std::string("continuous-profiling"));
+                spanEvent->SetTag(std::string("workloadKind"), std::string("Deployment"));
+                spanEvent->SetTag(std::string("source_ip"), std::string("10.28.197.177"));
+                spanEvent->SetTag(std::string("host"), std::string("continuous-profiling-5d7b7fd458-tkn2n"));
+                spanEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/20250113/" + std::to_string(j)));
                 spanEvent->SetTag(std::string("rpcType"), std::string("25"));
                 spanEvent->SetTag(std::string("callType"), std::string("http-client"));
                 spanEvent->SetTag(std::string("statusCode"), std::string("200"));
                 spanEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
-                spanEvent->SetName("/oneagent/qianlu/local/" + std::to_string(j));
+                spanEvent->SetName("/oneagent/qianlu/local/20250113/" + std::to_string(j));
                 spanEvent->SetKind(SpanEvent::Kind::Client);
                 std::string trace_id = GenerateRandomString(32);
                 std::string span_id = GenerateRandomString(16);
@@ -674,7 +732,7 @@ void eBPFServer::GenerateAgentInfo(logtail::QueueKey key, uint32_t idx) {
         std::shared_ptr<SourceBuffer> sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
         eventGroup.SetTag(std::string("data_type"), std::string("agent_info"));
-        const std::string app_id_key = "appId";
+        const std::string app_id_key = "pid";
         const std::string agentIdKey = "agentId";
         const std::string app_prefix = "app-";
         const std::string agent_version = "1.0.0-rc";
@@ -688,17 +746,16 @@ void eBPFServer::GenerateAgentInfo(logtail::QueueKey key, uint32_t idx) {
 
         const std::string agentVersionKey = "agentVersion";
 
-        for (int i = 0; i < 50; i ++) {
-            std::string app = app_prefix + std::to_string(i);
-            std::string ip = ip_prefix + std::to_string(i);
+        for (int i = 0; i < 1; i ++) {
+            std::string app = "ql-test-cp";
+            std::string ip = "10.28.197.177";
             auto logEvent = eventGroup.AddLogEvent();
-            logEvent->SetContent(app_id_key, app);
+            logEvent->SetContent(app_id_key, "6424c56cdaa1e5639d298e858c92d107");
+            logEvent->SetContent(appNameKey, app);
             logEvent->SetContent(ipKey, ip);
-            logEvent->SetContent(agentIdKey, app);
-            logEvent->SetContent(appNameKey, appNamePrefix + std::to_string(i));
+            logEvent->SetContent(std::string("hostname"), std::string("continuous-profiling-5d7b7fd458-tkn2n"));
             logEvent->SetContent(startTimestampKey, startTimestamp);
             logEvent->SetContent(agentVersionKey, "0.0.1");
-            // auto now = std::chrono::steady_clock::now();
             logEvent->SetTimestamp(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
         }
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), idx);
