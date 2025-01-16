@@ -35,7 +35,7 @@ public:
         mPluginIdx = index;
     }
 
-protected:
+public:
     const logtail::PipelineContext* mCtx = nullptr;
     logtail::QueueKey mQueueKey = 0;
     uint64_t mProcessTotalCnt = 0;
