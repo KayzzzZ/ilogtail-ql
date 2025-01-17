@@ -481,20 +481,21 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
         // 1000 timeseries for app
         std::vector<std::string> app_ids = {
             // "6424c56cdaa1e5639d298e858c92d107", 
-            "c33485654033468d8974eb4a13dfb1ba", 
+            "13e684e6383f8cd5e4a714a59a511e12", 
         };
         std::vector<std::string> app_names = {
             // "ql-test-cp", 
-            "ql-hz-test-external-http-server", 
+            "ql-test-insights-server-0", 
         };
 
         for (size_t i = 0; i < app_ids.size(); i ++) {
             std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
             mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
-            mTestEventGroup.SetTag(std::string("serverIp"), "10.28.197.199");
+            mTestEventGroup.SetTag(std::string("serverIp"), "10.28.197.197");
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("service"), app_names[i]);
+            mTestEventGroup.SetTag(std::string("host"), "insights-server-0-69c79fff7b-mxlmt");
             mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
 
             // set tag entity
@@ -505,11 +506,11 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
             evt->SetTag(std::string("resourcetype"), std::string("APPLICATION"));
             evt->SetTag(std::string("version"), std::string("v1"));
             evt->SetTag(std::string("clusterId"), std::string("c0748d004a7ce431d8da62ed8f6134879"));
-            evt->SetTag(std::string("host"), std::string("10.28.197.199"));
-            evt->SetTag(std::string("hostname"), std::string("external-http-server-0-64957b6b6d-s9mjz"));
+            evt->SetTag(std::string("host"), std::string("10.28.197.197"));
+            evt->SetTag(std::string("hostname"), std::string("insights-server-0-69c79fff7b-mxlmt"));
             evt->SetTag(std::string("namespace"), std::string("arms-apm-demo"));
             evt->SetTag(std::string("workloadKind"), std::string("Deployment"));
-            evt->SetTag(std::string("workloadName"), std::string("external-http-server-0"));
+            evt->SetTag(std::string("workloadName"), std::string("insights-server-0"));
             evt->SetName("arms_tag_entity");
             evt->SetValue(UntypedSingleValue{1.0});
             evt->SetTimestamp(seconds, 0);
@@ -527,10 +528,10 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
                         }
                     }
                     auto metricsEvent = mTestEventGroup.AddMetricEvent();
-                    metricsEvent->SetTag(std::string("workloadName"), std::string("external-http-server-0"));
+                    metricsEvent->SetTag(std::string("workloadName"), std::string("insights-server-0"));
                     metricsEvent->SetTag(std::string("workloadKind"), std::string("Deployment"));
                     // metricsEvent->SetTag(std::string("source_ip"), std::string("10.54.0.33"));
-                    metricsEvent->SetTag(std::string("host"), std::string("external-http-server-0-64957b6b6d-s9mjz"));
+                    metricsEvent->SetTag(std::string("host"), std::string("insights-server-0-69c79fff7b-mxlmt"));
                     metricsEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/20250113/" + std::to_string(z)));
                     metricsEvent->SetTag(std::string("rpcType"), std::string("0"));
                     metricsEvent->SetTag(std::string("callType"), std::string("http"));
@@ -554,9 +555,9 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
                 }
                 // for client metric
                 auto clientMetric = mTestEventGroup.AddMetricEvent();
-                clientMetric->SetTag(std::string("workloadName"), std::string("external-http-server-0"));
+                clientMetric->SetTag(std::string("workloadName"), std::string("insights-server-0"));
                 clientMetric->SetTag(std::string("workloadKind"), std::string("Deployment"));
-                clientMetric->SetTag(std::string("host"), std::string("external-http-server-0-64957b6b6d-s9mjz"));
+                clientMetric->SetTag(std::string("host"), std::string("insights-server-0-69c79fff7b-mxlmt"));
                 clientMetric->SetTag(std::string("rpc"), std::string("/mysql/exec"));
                 clientMetric->SetTag(std::string("rpcType"), std::string("25"));
                 clientMetric->SetTag(std::string("callType"), std::string("http_client"));
@@ -577,7 +578,8 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
             std::shared_ptr<SourceBuffer> mSourceBuffer = std::make_shared<SourceBuffer>();;
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
             mTestEventGroup.SetTag(std::string("pid"), std::string(app_ids[i]));
-            mTestEventGroup.SetTag(std::string("serverIp"), "10.28.197.199");
+            mTestEventGroup.SetTag(std::string("serverIp"), "10.28.197.197");
+            mTestEventGroup.SetTag(std::string("host"), "insights-server-0-69c79fff7b-mxlmt");
             mTestEventGroup.SetTag(std::string("source"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("service"), app_names[i]);
             mTestEventGroup.SetTag(std::string("data_type"), std::string("metric"));
@@ -585,10 +587,10 @@ void eBPFServer::GenerateMetric(logtail::QueueKey key, uint32_t idx) {
                 for (size_t z = 0; z < 20; z ++ ) {
                     auto metricsEvent = mTestEventGroup.AddMetricEvent();
                     metricsEvent->SetName(tcp_metrics_names[j]);
-                    metricsEvent->SetTag(std::string("workloadName"), std::string("external-http-server-0"));
+                    metricsEvent->SetTag(std::string("workloadName"), std::string("insights-server-0"));
                     metricsEvent->SetTag(std::string("workloadKind"), std::string("Deployment"));
-                    metricsEvent->SetTag(std::string("source_ip"), std::string("10.28.197.199"));
-                    metricsEvent->SetTag(std::string("host"), std::string("external-http-server-0-64957b6b6d-s9mjz"));
+                    metricsEvent->SetTag(std::string("source_ip"), std::string("10.28.197.197"));
+                    metricsEvent->SetTag(std::string("host"), std::string("insights-server-0-69c79fff7b-mxlmt"));
                     metricsEvent->SetTag(std::string("dest_ip"), std::string("10.54.0." + std::to_string(z)));
                     metricsEvent->SetTag(std::string("callType"), std::string("conn_stats"));
                     metricsEvent->SetValue(UntypedSingleValue{20.0});
@@ -637,11 +639,11 @@ void eBPFServer::GenerateSpan(logtail::QueueKey key, uint32_t idx) {
         // 1000 timeseries for app
         std::vector<std::string> app_ids = {
             // "6424c56cdaa1e5639d298e858c92d107", 
-            "c33485654033468d8974eb4a13dfb1ba",
+            "13e684e6383f8cd5e4a714a59a511e12",
         };
         std::vector<std::string> service_name = {
             // "ql-test-cp",
-            "ql-hz-test-external-http-server",
+            "ql-test-insights-server-0",
         };
 
         for (size_t i = 0; i < app_ids.size(); i ++) {
@@ -649,16 +651,17 @@ void eBPFServer::GenerateSpan(logtail::QueueKey key, uint32_t idx) {
             PipelineEventGroup mTestEventGroup(mSourceBuffer);
             mTestEventGroup.SetTag(std::string("service.name"), service_name[i]);
             mTestEventGroup.SetTag(std::string("arms.appId"), std::string(app_ids[i]));
-            mTestEventGroup.SetTag(std::string("host.ip"), "10.28.197.199");
+            mTestEventGroup.SetTag(std::string("host.ip"), "10.28.197.197");
+            mTestEventGroup.SetTag(std::string("host.name"), "insights-server-0-69c79fff7b-mxlmt");
             mTestEventGroup.SetTag(std::string("arms.app.type"), std::string("ebpf"));
             mTestEventGroup.SetTag(std::string("data_type"), std::string("trace"));
             for (size_t j = 0 ; j < 25; j ++) {
                 auto spanEvent = mTestEventGroup.AddSpanEvent();
                 // spanEvent->SetScopeTag();
-                spanEvent->SetTag(std::string("workloadName"), std::string("external-http-server-0"));
+                spanEvent->SetTag(std::string("workloadName"), std::string("insights-server-0"));
                 spanEvent->SetTag(std::string("workloadKind"), std::string("Deployment"));
-                spanEvent->SetTag(std::string("source_ip"), std::string("10.28.197.199"));
-                spanEvent->SetTag(std::string("host"), std::string("external-http-server-0-64957b6b6d-s9mjz"));
+                spanEvent->SetTag(std::string("source_ip"), std::string("10.28.197.197"));
+                spanEvent->SetTag(std::string("host"), std::string("insights-server-0-69c79fff7b-mxlmt"));
                 spanEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/20250113" + std::to_string(j)));
                 spanEvent->SetTag(std::string("rpcType"), std::string("0"));
                 spanEvent->SetTag(std::string("callType"), std::string("http"));
@@ -677,10 +680,10 @@ void eBPFServer::GenerateSpan(logtail::QueueKey key, uint32_t idx) {
             }
             for (size_t j = 0 ; j < 25; j ++) {
                 auto spanEvent = mTestEventGroup.AddSpanEvent();
-                spanEvent->SetTag(std::string("workloadName"), std::string("external-http-server-0"));
+                spanEvent->SetTag(std::string("workloadName"), std::string("insights-server-0"));
                 spanEvent->SetTag(std::string("workloadKind"), std::string("Deployment"));
-                spanEvent->SetTag(std::string("source_ip"), std::string("10.28.197.199"));
-                spanEvent->SetTag(std::string("host"), std::string("external-http-server-0-64957b6b6d-s9mjz"));
+                spanEvent->SetTag(std::string("source_ip"), std::string("10.28.197.197"));
+                spanEvent->SetTag(std::string("host"), std::string("insights-server-0-69c79fff7b-mxlmt"));
                 spanEvent->SetTag(std::string("rpc"), std::string("/oneagent/qianlu/local/20250113/" + std::to_string(j)));
                 spanEvent->SetTag(std::string("rpcType"), std::string("25"));
                 spanEvent->SetTag(std::string("callType"), std::string("http-client"));
@@ -736,12 +739,12 @@ void eBPFServer::GenerateAgentInfo(logtail::QueueKey key, uint32_t idx) {
 
         for (int i = 0; i < 1; i ++) {
             std::string app = "ql-test-cp";
-            std::string ip = "10.28.197.199";
+            std::string ip = "10.28.197.197";
             auto logEvent = eventGroup.AddLogEvent();
             logEvent->SetContent(app_id_key, "6424c56cdaa1e5639d298e858c92d107");
             logEvent->SetContent(appNameKey, app);
             logEvent->SetContent(ipKey, ip);
-            logEvent->SetContent(std::string("hostname"), std::string("external-http-server-0-64957b6b6d-s9mjz"));
+            logEvent->SetContent(std::string("hostname"), std::string("insights-server-0-69c79fff7b-mxlmt"));
             logEvent->SetContent(startTimestampKey, startTimestamp);
             logEvent->SetContent(agentVersionKey, "0.0.1");
             logEvent->SetTimestamp(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
