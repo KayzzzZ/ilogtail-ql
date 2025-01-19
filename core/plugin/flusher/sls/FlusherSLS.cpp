@@ -1264,6 +1264,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                                                     const std::string& subPath) const {
     string query;
     map<string, string> header;
+    LOG_DEBUG(sLogger,("ak", accessKeyId) ("sk", accessKeySecret) ("subpath", subPath) ("data", item->mData));
     PreparePostAPMBackendRequest(accessKeyId,
                                  accessKeySecret,
                                  type,
