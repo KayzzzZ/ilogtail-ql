@@ -245,20 +245,30 @@ bool eBPFServer::StartPluginInternal(
     if (prev_pipeline_name.size() && prev_pipeline_name != pipeline_name) {
         LOG_WARNING(sLogger,
                     ("pipeline already loaded, plugin type",
-                     int(type))("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
+                     magic_enum::enum_name(type))("prev pipeline", prev_pipeline_name)("curr pipeline", pipeline_name));
         return false;
     }
 
     if (prev_pipeline_name.size() && prev_pipeline_name == pipeline_name) {
-        // TODO @qianlu.kk for update scenario ...
-
-        // mgr->Update();
-        // for file/network security scenario, just update FILTER CONFIG
-        // for process scenario, do nothing, just resume
-        // for network observer scenario, we just need to update some user config, like enable metric or not ... 
-
-        // mgr->Resume();
-        return true;
+        LOG_INFO(sLogger, ("begin to update plugin", magic_enum::enum_name(type)));
+        auto pluginMgr = GetPluginManager(type);
+        if (pluginMgr) {
+            int res = pluginMgr->Update(options);
+            LOG_WARNING(sLogger, ("update plugin for type", magic_enum::enum_name(type)) ("res", res));
+            if (res) {
+                return false;
+            }
+            res = pluginMgr->Resume(options);
+            if (res) {
+                return false;
+            }
+            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), plugin_index);
+            LOG_WARNING(sLogger, ("resume plugin for type", magic_enum::enum_name(type)) ("res", res));
+            return true;
+        } else {
+            LOG_ERROR(sLogger, ("no plugin registered, should not happen", magic_enum::enum_name(type)));
+            return false;
+        }
     }
 
     UpdatePipelineName(type, pipeline_name, ctx->GetProjectName());
@@ -314,7 +324,7 @@ bool eBPFServer::StartPluginInternal(
         case PluginType::NETWORK_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr = NetworkSecurityManager::Create(
-                mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
+                    mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
                 UpdatePluginManager(type, pluginMgr);
             } else {
                 pluginMgr->UpdateBaseManager(mBaseManager);
@@ -328,7 +338,7 @@ bool eBPFServer::StartPluginInternal(
         case PluginType::FILE_SECURITY: {
             if (!pluginMgr) {
                 pluginMgr = FileSecurityManager::Create(
-                mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
+                    mBaseManager, mSourceManager, mDataEventQueue, mScheduler);
                 UpdatePluginManager(type, pluginMgr);
             } else {
                 pluginMgr->UpdateBaseManager(mBaseManager);
@@ -446,13 +456,13 @@ bool eBPFServer::SuspendPlugin(const std::string& pipeline_name, PluginType type
         return true;
     }
 
-    // TODO @qianlu.kk
-    // this will stop handle or push eventGroup to queue,
-    // we need to resume plugin when we restart plugin, and we don't implement yet...
-    // pay attention to timer process
-    // and we need to figure out wether we need to STOP plugin... especially for perf workers.
     mgr->UpdateContext(nullptr, -1, -1);
-    mgr->Suspend();
+
+    int ret = mgr->Suspend();
+    if (ret) {
+        LOG_ERROR(sLogger, ("failed to suspend plugin", magic_enum::enum_name(type)));
+        return false;
+    }
     mSuspendPluginTotal->Add(1);
     return true;
 }
