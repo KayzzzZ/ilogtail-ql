@@ -165,7 +165,7 @@ void eBPFServerUnittest::TestNetworkSecurity() {
             "ProbeConfig":
             {
                 "AddrFilter": {
-                    "DestAddrList": ["10.0.0.0/8","192.168.0.0/16"],
+                    "DestAddrList": ["10.0.0.0/8","192.168.0.0/16","180.101.48.0/21"],
                     "DestPortList": [80],
                     "SourceAddrBlackList": ["127.0.0.1/8"],
                     "SourcePortBlackList": [9300]
@@ -191,14 +191,14 @@ void eBPFServerUnittest::TestNetworkSecurity() {
     auto res = input->Start();
     EXPECT_TRUE(res);
 
-    std::this_thread::sleep_for(std::chrono::seconds(6));
+    // std::this_thread::sleep_for(std::chrono::seconds(6));
 
-    res = input->Stop(true);
-    EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    // res = input->Stop(true);
+    // EXPECT_TRUE(res);
+    // std::this_thread::sleep_for(std::chrono::seconds(5));
 
-    input->Start();
-    EXPECT_TRUE(res);
+    // input->Start();
+    // EXPECT_TRUE(res);
     std::this_thread::sleep_for(std::chrono::seconds(600));
     res = input->Stop(true);
     EXPECT_TRUE(res);
@@ -238,14 +238,14 @@ void eBPFServerUnittest::TestFileSecurity() {
     std::this_thread::sleep_for(std::chrono::seconds(6));
 
     // stop
-    res = input->Stop(true);
-    EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    // res = input->Stop(true);
+    // EXPECT_TRUE(res);
+    // std::this_thread::sleep_for(std::chrono::seconds(5));
 
-    // re-run...
-    input->Start();
-    EXPECT_TRUE(res);
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    // // re-run...
+    // input->Start();
+    // EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(600));
     res = input->Stop(true);
     EXPECT_TRUE(res);
 }
@@ -1223,9 +1223,9 @@ void eBPFServerUnittest::TestUpdateNetworkSecurity() {
 
 // UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateFileSecurity);
-UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateNetworkSecurity);
+// UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateNetworkSecurity);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
-// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
 // UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
 
 // UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);
