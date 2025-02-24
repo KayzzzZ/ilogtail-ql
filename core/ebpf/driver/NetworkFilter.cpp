@@ -85,9 +85,9 @@ int SetSaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
         ::memset(&kFilter, 0, sizeof(kFilter));
         kFilter.filter_type = FILTER_TYPE_SADDR;
         kFilter.op_type = OP_TYPE_IN;
-        filters.filters[filters.filter_count++] = kFilter;
         std::vector<addr4_lpm_trie> addr4Tries;
         std::vector<addr6_lpm_trie> addr6Tries;
+        filters.filters[filters.filter_count++] = kFilter;
         for (const auto& addr : config->mSourceAddrList) {
             auto result = ParseIpString(addr);
             std::string ip = result.first;
@@ -159,7 +159,6 @@ int SetSaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
         } else {
             kFilter.map_idx[1] = -1;
         }
-        filters.filters[filters.filter_count++] = kFilter;
     }
 
     return ret;
@@ -249,7 +248,6 @@ int SetSaddrBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
         } else {
             kFilter.map_idx[1] = -1;
         }
-        filters.filters[filters.filter_count++] = kFilter;
     }
 
     return ret;
@@ -261,11 +259,11 @@ int SetDaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                    const SecurityNetworkFilter* config) {
     int ret = 0;
     if (config->mDestAddrList.size()) {
-        selector_filter k_filter;
-        ::memset(&k_filter, 0, sizeof(k_filter));
-        k_filter.filter_type = FILTER_TYPE_DADDR;
-        k_filter.op_type = OP_TYPE_IN;
-        filters.filters[filters.filter_count++] = k_filter;
+        selector_filter kFilter;
+        ::memset(&kFilter, 0, sizeof(kFilter));
+        kFilter.filter_type = FILTER_TYPE_DADDR;
+        kFilter.op_type = OP_TYPE_IN;
+        filters.filters[filters.filter_count++] = kFilter;
         std::vector<addr4_lpm_trie> addr4_tries;
         std::vector<addr6_lpm_trie> addr6_tries;
         for (const auto& addr : config->mDestAddrList) {
@@ -297,7 +295,7 @@ int SetDaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
 
         if (addr4_tries.size()) {
             int ipv4Idx = IdAllocator::GetInstance()->GetNextId<Addr4Map>();
-            k_filter.map_idx[0] = ipv4Idx;
+            kFilter.map_idx[0] = ipv4Idx;
             for (auto arg4 : addr4_tries) {
                 uint8_t val = 1;
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
@@ -315,12 +313,12 @@ int SetDaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                 }
             }
         } else {
-            k_filter.map_idx[0] = -1;
+            kFilter.map_idx[0] = -1;
         }
 
         if (addr6_tries.size()) {
             int ipv6Idx = IdAllocator::GetInstance()->GetNextId<Addr6Map>();
-            k_filter.map_idx[1] = ipv6Idx;
+            kFilter.map_idx[1] = ipv6Idx;
             for (auto arg6 : addr6_tries) {
                 uint8_t val = 1;
                 ebpf_log(eBPFLogType::NAMI_LOG_TYPE_INFO,
@@ -337,9 +335,9 @@ int SetDaddrFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
                 }
             }
         } else {
-            k_filter.map_idx[1] = -1;
+            kFilter.map_idx[1] = -1;
         }
-        filters.filters[filters.filter_count++] = k_filter;
+        filters.filters[filters.filter_count++] = kFilter;
     }
 
     return ret;
@@ -429,7 +427,6 @@ int SetDaddrBlackFilter(std::shared_ptr<BPFWrapper<security_bpf>>& wrapper,
         } else {
             kFilter.map_idx[1] = -1;
         }
-        filters.filters[filters.filter_count++] = kFilter;
     }
 
     return ret;

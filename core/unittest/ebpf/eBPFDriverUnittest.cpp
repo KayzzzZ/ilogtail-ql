@@ -31,6 +31,7 @@ public:
     void TestFileFilter();
 
     void TestStartPlugin();
+    void TestPerfbufferManagement();
 
 protected:
     void SetUp() override {}
