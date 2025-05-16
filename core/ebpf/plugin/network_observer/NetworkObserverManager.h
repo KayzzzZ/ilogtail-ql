@@ -28,7 +28,6 @@
 #include "ebpf/util/FrequencyManager.h"
 #include "ebpf/util/sampler/Sampler.h"
 
-
 namespace logtail::ebpf {
 
 enum class JobType {
@@ -130,6 +129,16 @@ private:
 
     bool updateParsers(const std::vector<std::string>& protocols, const std::vector<std::string>& prevProtocols);
 
+    /**
+     * collect netns stats for arms app
+     */
+    void collectNetNsStats();
+
+    /**
+     * collect conn stats for cluster
+     */
+    void collectConnStats();
+
     std::unique_ptr<ConnectionManager> mConnectionManager;
 
     mutable std::atomic_long mDataEventsDropTotal = 0;
@@ -181,6 +190,11 @@ private:
 
     int mCidOffset = -1;
     std::unordered_set<std::string> mEnabledCids;
+
+    /**
+     * key is APP_ID
+     */
+    std::unordered_map<std::string, std::shared_ptr<AppDetails>> mApps;
 
     ReadWriteLock mAppAggLock;
     SIZETAggTreeWithSourceBuffer<AppMetricData, std::shared_ptr<AbstractRecord>> mAppAggregator;

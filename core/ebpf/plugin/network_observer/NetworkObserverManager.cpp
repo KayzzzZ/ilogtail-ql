@@ -1773,4 +1773,24 @@ void NetworkObserverManager::UpdateWhitelists(std::vector<std::string>&& enableC
     }
 }
 
+void NetworkObserverManager::collectNetNsStats() {
+    for (const auto& it : mApps) {
+        const std::string& appId = it.first;
+        const auto& appDetails = it.second;
+        if (appDetails == nullptr) {
+            continue;
+        }
+
+        for (const auto& cid : appDetails->mContainers) {
+            // get ns
+        }
+    }
+}
+
+void NetworkObserverManager::collectConnStats() {
+    // walk bpf map
+
+    // export metrics ...
+}
+
 } // namespace logtail::ebpf

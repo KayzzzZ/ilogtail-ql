@@ -27,6 +27,7 @@
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "common/timer/Timer.h"
+#include "common/ThreadPool.h"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/include/export.h"
@@ -128,6 +129,7 @@ protected:
     std::atomic<bool> mSuspendFlag = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
+    std::unique_ptr<ThreadPool> mThreadPool;
     PluginMetricManagerPtr mMetricMgr;
 
     mutable std::mutex mContextMutex;

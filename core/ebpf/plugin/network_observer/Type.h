@@ -98,6 +98,11 @@ struct ConnIdHash {
     }
 };
 
+struct AppDetails {
+    std::string mAppName;
+    std::vector<std::string> mContainers; // containerId
+};
+
 } // namespace logtail::ebpf
 
 

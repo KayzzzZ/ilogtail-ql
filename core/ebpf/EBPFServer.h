@@ -23,6 +23,7 @@
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/queue/blockingconcurrentqueue.h"
+#include "common/ThreadPool.h"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/include/export.h"
@@ -142,6 +143,8 @@ private:
     std::future<void> mHandler;
 
     FrequencyManager mFrequencyMgr;
+
+    std::unique_ptr<ThreadPool> mThreadPool;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
