@@ -23,6 +23,8 @@
 #include "common/StringView.h"
 #include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
+#include "common/version.h"
+#include "common/MachineInfoUtil.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
@@ -98,6 +100,7 @@ const static StringView kEBPFValue = "ebpf";
 const static StringView kMetricValue = "metric";
 const static StringView kTraceValue = "trace";
 const static StringView kLogValue = "log";
+const static StringView kAgentInfoValue = "agent_info";
 
 const static StringView kSpanTagKeyApp = "app";
 
@@ -1661,23 +1664,137 @@ int NetworkObserverManager::SendEvents() {
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
     // consume log agg tree -- 2000ms
     if (nowMs - mLastSendLogTimeMs >= mSendLogIntervalMs) {
-        LOG_DEBUG(sLogger, ("begin consume agg tree", "log"));
+        LOG_DEBUG(sLogger, ("begin consume log agg tree", "log"));
         ConsumeLogAggregateTree();
+        mLastSendLogTimeMs = nowMs;
     }
 
     // consume span agg tree -- 2000ms
     if (nowMs - mLastSendSpanTimeMs >= mSendSpanIntervalMs) {
-        LOG_DEBUG(sLogger, ("begin consume agg tree", "span"));
+        LOG_DEBUG(sLogger, ("begin consume span agg tree", "span"));
         ConsumeSpanAggregateTree();
+        mLastSendSpanTimeMs = nowMs;
     }
 
     // consume metric agg trees -- 15000ms
     if (nowMs - mLastSendMetricTimeMs >= mSendMetricIntervalMs) {
-        LOG_DEBUG(sLogger, ("begin consume agg tree", "metric"));
+        LOG_DEBUG(sLogger, ("begin consume metric agg tree", "metric"));
         ConsumeMetricAggregateTree();
-        // ConsumeNetMetricAggregateTree();
+        mLastSendMetricTimeMs = nowMs;
     }
+
+    if (nowMs - mLastSendAgentInfoTimeMs >= mSendMetricIntervalMs) {
+        LOG_DEBUG(sLogger, ("begin report agent info", "metric"));
+        ReportAgentInfo();
+        mLastSendAgentInfoTimeMs = nowMs;
+    }
+
     return 0;
+}
+
+const static std::string kAgentInfoAppIdKey = "pid";
+const static std::string kAgentInfoIpKey = "ip";
+const static std::string kAgentInfoHostnameKey = "hostname";
+const static std::string kAgentInfoAppnameKey = "appName";
+const static std::string kAgentInfoAgentVersionKey = "agentVersion";
+const static std::string kAgentInfoStartTsKey = "startTimestamp";
+
+void NetworkObserverManager::ReportAgentInfo() {
+    int cnt = 0;
+    for (const auto& configToWorkload : mConfigToWorkloads) {
+        const auto& workloadKeys = configToWorkload.second;
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        for (const auto& workloadKey : workloadKeys) {
+            PipelineEventGroup eventGroup(sourceBuffer);
+            eventGroup.SetTagNoCopy(kDataType.LogKey(), kAgentInfoValue);
+            const auto& it = mWorkloadConfigs.find(workloadKey);
+            if (it == mWorkloadConfigs.end()) {
+                continue;
+            }
+
+            auto& workloadConfig = it->second;
+            auto& appConfig = workloadConfig.config;
+            if (appConfig == nullptr) {
+                continue;
+            }
+
+            for (const auto& containerId : workloadConfig.containerIds) {
+                // report agent info
+                // generate for k8s ---- POD Level
+                if (K8sMetadata::GetInstance().Enable()) {
+                    auto podMeta = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(containerId);
+                    if (podMeta == nullptr) {
+                        LOG_DEBUG(sLogger, ("failed to fetch containerId", containerId));
+                        continue;
+                    }
+
+                    auto* event = eventGroup.AddLogEvent();
+                    event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
+                    event->SetContent(kAgentInfoIpKey, podMeta->mPodIp);
+                    event->SetContent(kAgentInfoHostnameKey, podMeta->mPodName);
+                    event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
+                    event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+                    event->SetContent(kAgentInfoStartTsKey, ToString(podMeta->mTimestamp));
+                    cnt++;
+                } else {
+                    // generate for other ...
+                    // Instance Level
+                    auto* event = eventGroup.AddLogEvent();
+                    event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
+                    event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
+                    event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+                    // event->SetContent(kAgentInfoStartTsKey, ToString(podMeta->mTimestamp));
+                    static const std::string kSelfPodIp = [] {
+                        const char* podIp = std::getenv("POD_IP");
+                        return podIp ? podIp : "";
+                    }();
+                    static const std::string kSelfPodName = [] {
+                        const char* podName = std::getenv("POD_NAME");
+                        return podName ? podName : "";
+                    }();
+                    if (kSelfPodIp.empty()) {
+                        event->SetContent(kAgentInfoHostnameKey, GetHostIp());
+                    } else {
+                        event->SetContentNoCopy(kAgentInfoIpKey, kSelfPodIp);
+                    }
+
+                    if (kSelfPodName.empty()) {
+                        event->SetContent(kAgentInfoHostnameKey, GetHostName());
+                    } else {
+                        event->SetContentNoCopy(kAgentInfoHostnameKey, kSelfPodName);
+                    }
+                    cnt++;
+                }
+
+            }
+            size_t eventsSize = eventGroup.GetEvents().size();
+            if (eventsSize > 0) {
+                auto& pushLogsTotal = appConfig->mPushLogsTotal;
+                auto& pushLogGroupTotal = appConfig->mPushLogGroupTotal;
+                // push
+                ADD_COUNTER(pushLogsTotal, eventsSize);
+                ADD_COUNTER(pushLogGroupTotal, 1);
+                LOG_DEBUG(sLogger, ("agentinfo group size", eventsSize));
+                std::unique_ptr<ProcessQueueItem> item
+                    = std::make_unique<ProcessQueueItem>(std::move(eventGroup), appConfig->mPluginIndex);
+                for (size_t times = 0; times < 5; times++) {
+                    auto result = ProcessQueueManager::GetInstance()->PushQueue(appConfig->mQueueKey, std::move(item));
+                    if (QueueStatus::OK != result) {
+                        LOG_WARNING(sLogger,
+                                    ("configName", appConfig->mConfigName)("pluginIdx", appConfig->mPluginIndex)(
+                                        "[NetworkObserver] push agentinfo to queue failed!", magic_enum::enum_name(result)));
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    } else {
+                        LOG_DEBUG(sLogger, ("NetworkObserver push agentinfo successful, events:", eventsSize));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    LOG_DEBUG(sLogger, ("ReportAgentInfo count:", cnt));
+    
 }
 
 int NetworkObserverManager::HandleEvent([[maybe_unused]] const std::shared_ptr<CommonEvent>& commonEvent) {

@@ -131,6 +131,7 @@ public:
     bool ConsumeSpanAggregateTree();
     bool ConsumeNetMetricAggregateTree();
     bool UploadHostMetadataUpdateTask();
+    void ReportAgentInfo();
 
     void HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec);
 
@@ -227,6 +228,7 @@ private:
     int64_t mLastSendSpanTimeMs = INT_MIN;
     int64_t mLastSendMetricTimeMs = INT_MIN;
     int64_t mLastSendLogTimeMs = INT_MIN;
+    int64_t mLastSendAgentInfoTimeMs = INT_MIN;
 
     int64_t mSendSpanIntervalMs = 2000;
     int64_t mSendLogIntervalMs = 2000;
